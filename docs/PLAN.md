@@ -57,3 +57,90 @@ Backend: `/api/ai/{summarize,translate,stt,tts}` using Gemini with one key; inpu
 
 ## Definition of done
 Every requirement R1–R11 and the four AI features demoed from two physical computers, `pytest` green, no secrets committed.
+
+---
+
+# Plan v2 — vertical slices by feature
+
+v1 above splits by layer (P1–P4). v2 splits by **feature**: one person takes a feature end to end (backend + frontend + tests), which is one issue and one branch (`feat/#N-name`). Both versions are valid; v2 is the one to execute from. `docs/CONTRACT.md` is unchanged and still the only shared interface.
+
+## F0 — Scaffold (one person first, everyone waits ~1 hour)
+Same skeleton as v1 Step 0, plus the parts that stop merge conflicts between features:
+- **Backend dispatcher**: `chat/ws.py` routes each frame by `type` to a registry (`handlers: dict[str, Callable]`). A feature adds its own file `chat/handlers/<feature>.py` and one registration line; nobody edits a shared handler body.
+- **Frontend store slices**: one file per feature in `frontend/src/features/<feature>/` (components + a `useX` hook + its slice of the WS message handling); a single `ws/client.ts` exposes `send(type, payload)` and `on(type, fn)`.
+- **Dev auth stub**: with `DEV_AUTH=1` the token is just a username, so any feature runs without F1.
+- Tooling the workflow gate needs: `ruff`, `bandit`, `pip-audit`, `pytest`; `eslint`, `vitest`; `.gitattributes` (LF); CI running them.
+
+## Features
+| # | Feature | Req | Backend | Frontend | Needs |
+|---|---|---|---|---|---|
+| F1 | Auth | R3 | register, login, bcrypt, JWT, `/api/me`, real `get_current_user` | login/register pages, token storage, route guard | F0 |
+| F2 | Connect + online users | R4 | `/ws` auth, `init`, `presence`, hub connection map | WS client w/ reconnect, sidebar user list with online dots | F0 (F1 optional via stub) |
+| F3 | Private chat | R5 R6 R7 | `dm.open`, `message.send`, `history.get`, persistence, private-room delivery | click user → room, message window + chat box | F2 |
+| F4 | Group create + list | R8 R9 | `group.create`, `group.upsert` broadcast, groups in `init` | create-group form, group list with members | F2 |
+| F5 | Group join + chat | R10 R11 | `group.join`, member-only delivery and history, `room.upsert` | Join button, group room reuses F3's room view | F3, F4 |
+| F6 | Group leave + delete | – | `group.leave`, `group.delete`, creator rules | Leave/Delete buttons by role | F4 (F5 for realism) |
+| F7 | Unread markers | – | `read.mark`, `unread` in `init`, never counts own messages | badges, mark-read while room visible | F3 |
+| F8 | Summarize unread | AI 1 | `/api/ai/summarize` (Gemini) | button when unread > 0, sends ≤200 unread messages | fixtures now; real data after F7 |
+| F9 | Translate | AI 2 | `/api/ai/translate`, `PUT /api/me` targetLang | per-message button, language select | message component from F3 (playground until then) |
+| F10 | Text-to-speech | AI 3 | `/api/ai/tts` | per-message speaker button | same as F9 |
+| F11 | Speech-to-text | AI 4 | `/api/ai/stt` | mic button → chat box | chat box from F3 (playground until then) |
+| F12 | Deploy + slides | R1 bonus | Dockerfile, Render, Atlas M0, LAN fallback | – | F1–F3 working |
+
+Each feature develops against the contract with mocks, so the "Needs" column only decides **merge order**, not who is blocked.
+
+## Dependency chart
+Arrow = "merge after". Anything with no arrow between two features can be worked on at the same time. Pick tasks yourselves; nobody is pre-assigned.
+
+```mermaid
+flowchart TD
+  F0[F0 Scaffold] --> F1[F1 Auth]
+  F0 --> F2[F2 Connect + online users]
+  F0 --> F8[F8 AI: Summarize unread]
+  F0 --> F9[F9 AI: Translate]
+  F0 --> F10[F10 AI: Text-to-speech]
+  F0 --> F11[F11 AI: Speech-to-text]
+  F1 -.optional, DEV_AUTH stub.-> F2
+  F2 --> F3[F3 Private chat]
+  F2 --> F4[F4 Group create + list]
+  F3 --> F5[F5 Group join + chat]
+  F4 --> F5
+  F4 --> F6[F6 Group leave + delete]
+  F3 --> F7[F7 Unread markers]
+  F3 -.UI attach point.-> F9
+  F3 -.UI attach point.-> F10
+  F3 -.UI attach point.-> F11
+  F7 -.real unread data.-> F8
+  F1 --> F12[F12 Deploy + slides]
+  F2 --> F12
+  F3 --> F12
+```
+Solid arrows block merging. Dotted arrows only block the final wiring, not the work: build against a stub, fixture or playground page and connect it after the other feature lands.
+
+| Feature | Can start when | Merge after | Final wiring needs |
+|---|---|---|---|
+| F0 Scaffold | now | – | – |
+| F1 Auth | F0 | F0 | – |
+| F2 Connect + users | F0 | F0 | F1 (else DEV_AUTH) |
+| F3 Private chat | F2 contract is known (can mock) | F2 | – |
+| F4 Group create + list | F0 (mock hub) | F2 | – |
+| F5 Group join + chat | F0 (mock) | F3, F4 | – |
+| F6 Group leave + delete | F0 (mock) | F4 | F5 for realism |
+| F7 Unread markers | F0 (mock) | F3 | – |
+| F8 Summarize unread | F0 (fixtures) | F0 | F7 |
+| F9 Translate | F0 (playground) | F0 | F3 message view |
+| F10 Text-to-speech | F0 (playground) | F0 | F3 message view |
+| F11 Speech-to-text | F0 (playground) | F0 | F3 chat box |
+| F12 Deploy + slides | F0 (infra) | F1, F2, F3 for a useful demo | everything for slides |
+
+Critical path (Part 2 gates Part 3): F0 -> F2 -> F3 -> F5. Everything else hangs off it. Final step for everyone: integration on two physical computers, R1-R11 + the four AI features checklist, demo rehearsal.
+
+## Rules that keep it parallel
+- A feature touches only its own handler file, its own `features/<name>/` folder, and its own tests. Anything shared (`CONTRACT.md`, dispatcher, `ws/client.ts`) changes in a separate small `chore:` PR everyone sees.
+- Merge to `main` in the "Needs" order; rebase on `main` before opening a PR.
+- If a feature needs something from an unmerged feature, use the stub or fixture and leave a `TODO(F#)` comment; remove it when that feature lands.
+- Each feature's PR includes its tests and passes the AGENTS.md gate (test → lint → security).
+- One GitHub issue per F-number, titled `F3 Private chat`; branch `feat/#<issue>-private-chat`.
+
+## Definition of done
+Unchanged from v1.

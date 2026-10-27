@@ -1,0 +1,40 @@
+digraph G {
+  rankdir=TB; nodesep=0.5; ranksep=0.7; bgcolor="white";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12, margin="0.2,0.12"];
+  edge [fontname="Helvetica", fontsize=10, color="#444444"];
+
+  F0  [label="F0  Scaffold", fillcolor="#e5e7eb"];
+  F1  [label="F1  Auth\n(R3)", fillcolor="#dbeafe"];
+  F2  [label="F2  Connect + online users\n(R4)", fillcolor="#dbeafe"];
+  F3  [label="F3  Private chat\n(R5-R7)", fillcolor="#dbeafe"];
+  F4  [label="F4  Group create + list\n(R8-R9)", fillcolor="#dbeafe"];
+  F5  [label="F5  Group join + chat\n(R10-R11)", fillcolor="#dbeafe"];
+  F6  [label="F6  Group leave + delete", fillcolor="#dbeafe"];
+  F7  [label="F7  Unread markers", fillcolor="#dbeafe"];
+  F8  [label="F8  AI: Summarize unread", fillcolor="#dcfce7"];
+  F9  [label="F9  AI: Translate", fillcolor="#dcfce7"];
+  F10 [label="F10  AI: Text-to-speech", fillcolor="#dcfce7"];
+  F11 [label="F11  AI: Speech-to-text", fillcolor="#dcfce7"];
+  F12 [label="F12  Deploy + slides", fillcolor="#fef3c7"];
+
+  F0 -> {F1 F2 F8 F9 F10 F11};
+  F1 -> F2 [style=dashed, label="optional\n(DEV_AUTH stub)"];
+  F2 -> F3; F2 -> F4;
+  F3 -> F5; F4 -> F5;
+  F4 -> F6;
+  F3 -> F7;
+  F3 -> F9  [style=dashed, label="UI attach"];
+  F3 -> F10 [style=dashed];
+  F3 -> F11 [style=dashed];
+  F7 -> F8  [style=dashed, label="real unread data"];
+  F1 -> F12; F2 -> F12; F3 -> F12;
+
+  subgraph cluster_legend {
+    label="Legend"; fontname="Helvetica"; style=rounded; color="#9ca3af";
+    L1 [label="Part 2 chat feature", fillcolor="#dbeafe"];
+    L2 [label="Part 3 AI feature", fillcolor="#dcfce7"];
+    L3 [label="Deploy / slides", fillcolor="#fef3c7"];
+    L1 -> L2 [label="solid: merge after"];
+    L2 -> L3 [style=dashed, label="dashed: only final wiring waits"];
+  }
+}
