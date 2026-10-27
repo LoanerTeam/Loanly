@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+motor
+pydantic-settings
+bcrypt
+pyjwt
+google-genai
+python-multipart
