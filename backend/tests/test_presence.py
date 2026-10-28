@@ -122,14 +122,13 @@ async def test_registration_serialized_with_snapshot(monkeypatch):
 
 
 def test_endpoint_init_presence_and_cleanup(dev_auth):
-    with TestClient(app) as client:
-        with client.websocket_connect("/ws?token=alice") as alice:
-            assert alice.receive_json()["type"] == "init"
-            assert alice.receive_json() == {"type": "presence", "username": "alice", "online": True}
-            with client.websocket_connect("/ws?token=bob") as bob:
-                assert bob.receive_json()["type"] == "init"
-                assert alice.receive_json() == {"type": "presence", "username": "bob", "online": True}
-            assert alice.receive_json() == {"type": "presence", "username": "bob", "online": False}
+    with TestClient(app) as client, client.websocket_connect("/ws?token=alice") as alice:
+        assert alice.receive_json()["type"] == "init"
+        assert alice.receive_json() == {"type": "presence", "username": "alice", "online": True}
+        with client.websocket_connect("/ws?token=bob") as bob:
+            assert bob.receive_json()["type"] == "init"
+            assert alice.receive_json() == {"type": "presence", "username": "bob", "online": True}
+        assert alice.receive_json() == {"type": "presence", "username": "bob", "online": False}
     assert not connections
 
 
@@ -138,11 +137,10 @@ def test_snapshot_failure_never_leaks_connection(monkeypatch, dev_auth):
         raise RuntimeError("database unavailable")
 
     monkeypatch.setattr(presence, "registered_usernames", fail)
-    with TestClient(app) as client:
-        with client.websocket_connect("/ws?token=alice") as ws:
-            with pytest.raises(WebSocketDisconnect) as error:
-                ws.receive_json()
-            assert error.value.code == 1011
+    with TestClient(app) as client, client.websocket_connect("/ws?token=alice") as ws:
+        with pytest.raises(WebSocketDisconnect) as error:
+            ws.receive_json()
+        assert error.value.code == 1011
     assert not connections
 
 

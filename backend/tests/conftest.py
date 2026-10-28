@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 from app.chat import hub, presence
-
 from app.chat.hub import connections, dev_users
 
 
