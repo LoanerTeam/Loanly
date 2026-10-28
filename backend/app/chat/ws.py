@@ -1,5 +1,6 @@
 import json
 
+import anyio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pymongo.errors import PyMongoError
 
@@ -35,7 +36,10 @@ async def ws_endpoint(ws: WebSocket, token: str = ""):
         except (OSError, RuntimeError):
             pass
     finally:
-        await disconnect(conn)
+        # TestClient and server shutdown may cancel the receive task. Finish the
+        # bounded presence cleanup so other Clients still see the offline event.
+        with anyio.CancelScope(shield=True):
+            await disconnect(conn)
 
 
 async def dispatch(conn: Connection, raw: str) -> None:

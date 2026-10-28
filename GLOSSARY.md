@@ -20,7 +20,7 @@ A Chat Room for exactly two users, created the first time either one messages th
 _Avoid_: DM, direct chat
 
 **Group**
-A Chat Room with a unique name, created by one user (the Creator) who is initially its only Member. Visible to everyone in the Group list, with its Member list.
+A Chat Room whose name is unique per Creator. Different Creators may use the same name. The Creator is initially its only Member. Visible to everyone in the Group list, with its Member list.
 _Avoid_: channel, team
 
 **Creator**

@@ -1,8 +1,9 @@
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 
-from app.chat import hub, presence
+from app.chat import groups, hub, presence
 from app.chat.hub import connections, dev_users
 
 
@@ -11,6 +12,8 @@ def clear_presence(monkeypatch):
     lock = asyncio.Lock()
     monkeypatch.setattr(hub, "presence_lock", lock)
     monkeypatch.setattr(presence, "presence_lock", lock)
+    monkeypatch.setattr(groups, "ensure_indexes", AsyncMock())
+    monkeypatch.setattr(presence, "list_groups", AsyncMock(return_value=[]))
     connections.clear()
     dev_users.clear()
     yield

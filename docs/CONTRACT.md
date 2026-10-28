@@ -8,6 +8,7 @@ Vocabulary is in `GLOSSARY.md`.
 - IDs are strings (Mongo ObjectId hex). `ts` is ISO-8601 UTC.
 - REST base `/api`, `Authorization: Bearer <jwt>`. Errors: `{ "error": "<code>", "detail": "<text>" }`.
 - Message text: 1–2000 chars.
+- Group names are trimmed and case-sensitive, unique per Creator. Different Creators may create Groups with the same name; a duplicate for the same Creator returns `name_taken`.
 
 ## Shapes
 ```

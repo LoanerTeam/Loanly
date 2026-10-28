@@ -40,11 +40,13 @@ def _remove(conn: Connection) -> bool:
     return False
 
 
-async def broadcast(type: str, **payload) -> None:
+async def broadcast(type: str, *, requester: Connection | None = None,
+                    req_id: object = None, **payload) -> None:
     """Best-effort fanout. Caller holds presence_lock for presence transitions."""
     async def deliver(conn: Connection) -> None:
         try:
-            await conn.send(type, **payload)
+            reply = {**payload, "reqId": req_id} if conn is requester and req_id is not None else payload
+            await conn.send(type, **reply)
         except (OSError, RuntimeError, TimeoutError, WebSocketDisconnect):
             failed.append(conn)
 
