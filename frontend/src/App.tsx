@@ -4,6 +4,7 @@ import { resetPresence } from './features/presence/store'
 import { usePresence } from './features/presence/usePresence'
 import { UserList } from './features/presence/UserList'
 import { ConnectionStatus } from './features/presence/ConnectionStatus'
+import { readDevSession, saveDevSession, clearDevSession } from './features/presence/session'
 
 // F1 can render this with its JWT; the username form is development-only.
 export function PresenceApp({ token, onDisconnect }: { token: string; onDisconnect: () => void }) {
@@ -36,10 +37,18 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
   )
 }
 export default function App() {
-  const [token, setToken] = useState('')
+  const [token, setToken] = useState(() => import.meta.env.DEV ? readDevSession() : '')
   const [username, setUsername] = useState('')
-  if (token) return <PresenceApp token={token} onDisconnect={() => setToken('')} />
-  const submit = (event: FormEvent) => { event.preventDefault(); setToken(username.trim()) }
+  if (token) return <PresenceApp token={token} onDisconnect={() => {
+    clearDevSession()
+    setToken('')
+  }} />
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    const next = username.trim()
+    saveDevSession(next)
+    setToken(next)
+  }
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-800">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8">
