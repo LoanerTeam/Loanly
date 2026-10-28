@@ -28,7 +28,7 @@ Tick each box while watching both screens. Expected result is in the last column
 | R6 | In a room | A message window and a chat box exist; sent and incoming messages appear live |
 | R7 | alice DMs bob; carol looks everywhere | Only alice and bob see it; carol sees nothing, no unread badge |
 | R8 | alice creates group `team` | Group exists with alice as the only member |
-| R9 | bob and carol open the group list | They see `team` with members `[alice]`; group name `team` twice is rejected |
+| R9 | bob and carol open the group list; alice creates `team` again; bob creates `team` | All see Alice's Group with members `[alice]`; Alice's duplicate is rejected; Bob's separate Group succeeds with members `[bob]` |
 | R10 | alice does not add anyone; bob clicks Join | bob becomes a member by himself; carol is not added |
 | R11 | alice sends in `team`; carol (non-member) checks | alice and bob see it live; carol never sees it |
 | Groups | bob leaves `team`, rejoins; alice tries to leave; bob tries to delete; alice deletes | bob can leave and rejoin; alice cannot leave; only alice can delete; deleting removes the group for everyone |

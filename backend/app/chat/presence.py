@@ -1,5 +1,6 @@
 import asyncio
 
+from app.chat.groups import list_groups
 from app.chat.hub import Connection, _remove, broadcast, connections, dev_users, presence_lock
 from app.config import settings
 from app.db import get_db
@@ -16,6 +17,7 @@ async def initialize(conn: Connection) -> None:
     async with presence_lock:
         async with asyncio.timeout(5):
             names = await registered_usernames()
+            groups = await list_groups()
         first = not connections.get(conn.username)
         if settings.dev_auth:
             dev_users.add(conn.username)
@@ -29,8 +31,9 @@ async def initialize(conn: Connection) -> None:
                 me=conn.username,
                 users=[{"username": name, "online": bool(connections.get(name))}
                        for name in sorted(names)],
-                # TODO(F3/F4/F7): populate room, group and unread snapshots here.
-                rooms=[], groups=[], unread={},
+                # TODO(F3/F7): add Private Rooms and unread snapshots here.
+                rooms=[group for group in groups if conn.username in group["members"]],
+                groups=groups, unread={},
             )
         except BaseException:
             # Roll back before releasing the lock, including task cancellation.

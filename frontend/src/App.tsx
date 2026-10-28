@@ -5,14 +5,20 @@ import { usePresence } from './features/presence/usePresence'
 import { UserList } from './features/presence/UserList'
 import { ConnectionStatus } from './features/presence/ConnectionStatus'
 import { readDevSession, saveDevSession, clearDevSession } from './features/presence/session'
+import { resetGroups } from './features/groups/store'
+import { useGroups } from './features/groups/useGroups'
+import { GroupList } from './features/groups/GroupList'
+import { CreateGroupForm } from './features/groups/CreateGroupForm'
 
 // F1 can render this with its JWT; the username form is development-only.
 export function PresenceApp({ token, onDisconnect }: { token: string; onDisconnect: () => void }) {
   const { me, users, status } = usePresence()
+  const { groups } = useGroups()
   useEffect(() => {
     resetPresence()
+    resetGroups()
     connect(token)
-    return () => { disconnect(); resetPresence() }
+    return () => { disconnect(); resetPresence(); resetGroups() }
   }, [token])
   return (
     <main className="min-h-screen bg-slate-50 p-6 text-slate-800">
@@ -26,6 +32,11 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
             <h2 className="mb-3 font-semibold">Users <span className="text-sm font-normal text-slate-500">{users.filter((u) => u.online).length} online</span></h2>
             <UserList users={users} me={me} />
             {!users.length && <p className="px-3 py-2 text-sm text-slate-500">Waiting for user list…</p>}
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <h2 className="mb-3 font-semibold">Groups</h2>
+              <GroupList groups={groups} me={me} />
+              <CreateGroupForm />
+            </div>
           </aside>
           <section className="rounded-2xl border border-slate-200 bg-white p-8">
             <h2 className="text-xl font-semibold">Welcome{me ? `, ${me}` : ''}</h2>
