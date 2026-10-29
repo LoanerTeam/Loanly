@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     mongodb_db: str = "loanly"
     jwt_secret: str = "change-me"
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
     dev_auth: bool = False
 
 

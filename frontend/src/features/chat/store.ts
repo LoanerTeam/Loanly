@@ -2,6 +2,8 @@ import { getConnectionStatus, isInitFrame, on, send, subscribeConnection, type F
 import { isGroup } from '../groups/types'
 import { isMessage, isRoom, MAX_TEXT, type Message, type Room } from './types'
 
+// Unread count of a room when it was last marked read, kept so it can still be summarized.
+export type CatchUp = { roomId: string; count: number; lastId: string }
 export type ChatState = {
   rooms: Room[]
   messages: Record<string, Message[]>
@@ -11,9 +13,10 @@ export type ChatState = {
   joining: string // id of the Group a pending group.join is for
   me: string
   unread: Record<string, number>
+  catchUp: CatchUp | null
   error: string
 }
-const initial = (): ChatState => ({ rooms: [], messages: {}, loaded: [], activeId: '', pendingOpen: null, joining: '', me: '', unread: {}, error: '' })
+const initial = (): ChatState => ({ rooms: [], messages: {}, loaded: [], activeId: '', pendingOpen: null, joining: '', me: '', unread: {}, catchUp: null, error: '' })
 let state = initial()
 let sequence = 0
 let lastMarked: Record<string, string> = {} // roomId -> last message id we told the server about
@@ -38,7 +41,9 @@ export function markActiveRead(): void {
   const list = state.messages[roomId] ?? []
   const last = list[list.length - 1]
   if (!last || !state.loaded.includes(roomId)) return
-  if (state.unread[roomId]) update({ unread: { ...state.unread, [roomId]: 0 } })
+  if (state.unread[roomId]) {
+    update({ unread: { ...state.unread, [roomId]: 0 }, catchUp: { roomId, count: state.unread[roomId], lastId: last.id } })
+  }
   if (lastMarked[roomId] === last.id) return
   if (send('read.mark', { roomId, messageId: last.id })) lastMarked[roomId] = last.id
 }
@@ -91,6 +96,7 @@ function dropRoom(roomId: string): void {
     loaded: state.loaded.filter((id) => id !== roomId),
     unread: Object.fromEntries(Object.entries(state.unread).filter(([id]) => id !== roomId)),
     activeId: state.activeId === roomId ? '' : state.activeId,
+    catchUp: state.catchUp?.roomId === roomId ? null : state.catchUp,
   })
 }
 export function receiveMessage(frame: Frame): void {
@@ -122,7 +128,7 @@ export function connectionChanged(): void {
 }
 
 export function selectRoom(roomId: string): void {
-  update({ activeId: roomId, error: '' })
+  update({ activeId: roomId, error: '', ...(state.catchUp?.roomId === roomId ? {} : { catchUp: null }) })
   fetchHistory(roomId)
   markActiveRead()
 }

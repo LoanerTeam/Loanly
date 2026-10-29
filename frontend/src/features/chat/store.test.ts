@@ -148,3 +148,19 @@ test('group.removed drops a deleted Group room, its messages and unread, and clo
   receiveGroupRemoved({ type: 'group.removed', groupId: 5 })
   expect(getChat().rooms).toHaveLength(1)
 })
+
+test('marking a room read keeps its unread count as catch-up for summarizing', () => {
+  receiveInit({ type: 'init', me: 'alice', users: [], rooms: [room, { ...team, members: ['bob', 'alice'] }], unread: { r1: 2 } })
+  selectRoom('r1')
+  expect(getChat().catchUp).toBeNull() // history not loaded yet
+  receiveHistory({ type: 'history', roomId: 'r1', messages: [msg('m1'), msg('m2')] })
+  expect(getChat().unread.r1).toBe(0)
+  expect(getChat().catchUp).toEqual({ roomId: 'r1', count: 2, lastId: 'm2' })
+  receiveMessage({ type: 'message.new', message: msg('m3') }) // read live: no new catch-up
+  expect(getChat().catchUp).toEqual({ roomId: 'r1', count: 2, lastId: 'm2' })
+  selectRoom('g1')
+  expect(getChat().catchUp).toBeNull()
+  selectRoom('r1')
+  receiveRoomRemoved({ type: 'room.removed', roomId: 'r1' })
+  expect(getChat().catchUp).toBeNull()
+})
