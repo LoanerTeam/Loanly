@@ -1,5 +1,8 @@
 import asyncio
 
+from bson import ObjectId
+from bson.errors import InvalidId
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from app.chat.hub import ChatError
@@ -43,3 +46,24 @@ async def create_group(name: str, creator: str) -> dict:
         raise ChatError("name_taken", "You already created a Group with this name") from error
     document["_id"] = result.inserted_id
     return serialize(document)
+
+
+async def join_group(group_id: str, username: str) -> tuple[dict, bool]:
+    """Add the user to a Group's Members; returns the Group and whether they were newly added."""
+    try:
+        oid = ObjectId(group_id)
+    except (InvalidId, TypeError) as error:
+        raise ChatError("not_found", "no such Group") from error
+    async with asyncio.timeout(5):
+        rooms = get_db().rooms
+        # Filtering on non-membership makes the add atomic and tells a repeat join apart.
+        document = await rooms.find_one_and_update(
+            {"_id": oid, "kind": "group", "members": {"$ne": username}},
+            {"$push": {"members": username}}, return_document=ReturnDocument.AFTER,
+        )
+        if document is not None:
+            return serialize(document), True
+        document = await rooms.find_one({"_id": oid, "kind": "group"})
+    if document is None:
+        raise ChatError("not_found", "no such Group")
+    return serialize(document), False
