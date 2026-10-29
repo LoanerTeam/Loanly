@@ -81,3 +81,22 @@ LOANLY_TEST_MONGODB_URI=mongodb://localhost:27017 pytest
 Integration tests create and drop their own randomly named `loanly_test_*`
 database. Without that variable the MongoDB integration test is explicitly
 skipped; unit tests still run. CI supplies a MongoDB service for this test.
+
+## F5: join Groups and chat
+
+Start the backend and frontend as described for F4 (MongoDB is required). Connect
+as `alice`, `bob` and `carol` in separate browser tabs. Alice creates `team` and
+sends a few messages in it. Group members see **Open** on the Group; everyone
+else sees **Join**.
+
+Bob clicks **Join**: he becomes a Member by himself, his Chat Room for `team`
+opens, and every user's Group list shows Members `alice, bob`. Nobody can add
+another user, so Carol is not added. Bob sees the Group's full history, but
+messages sent before he joined are not counted as Unread; only later messages
+from others are. Alice's new messages appear live for Alice and Bob only. Carol
+never receives them; a `message.send` or `history.get` for the Group from her
+console returns `not_member`. Joining again is harmless, and every open tab of
+the joining user gets the room. Leaving and deleting Groups are part of F6.
+
+`backend/tests/test_group_join.py` covers these rules over a real `/ws`
+connection with an in-memory database, so plain `pytest` runs it.
