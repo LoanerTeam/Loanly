@@ -63,10 +63,12 @@ Generation checks ignore obsolete authentication responses; an old token's 401
 does not sign out a newer account. F9 and other protected REST features can use
 `features/auth/api.apiRequest(path, {token, ...})` for the same 401 handling.
 
-Shared application wiring belongs in a separate `chore:` PR per `PLAN.md`.
-The existing development Username form should only be available when both
+Shared application wiring is kept in a separate `chore:` PR per `PLAN.md`.
+The development Username form is only available when both
 Vite development mode and `VITE_DEV_AUTH=1` are enabled. Normal Vite development
-uses the real Login/Register pages.
+uses the real Login/Register pages. `app.main` initializes accounts at startup
+and mounts the Auth router before the frontend; `App.tsx` wraps `PresenceApp`
+with `AuthApp`.
 
 ## Validation
 
