@@ -67,3 +67,35 @@ async def list_messages(room_id: str) -> list[dict]:
 async def list_private_rooms(username: str) -> list[dict]:
     cursor = get_db().rooms.find({"kind": "private", "members": username})
     return [room_dto(room, username) async for room in cursor]
+
+
+async def set_read_marker(username: str, room_id: str, message_id: ObjectId) -> None:
+    # $max keeps the marker monotonic: a late or replayed mark never moves it backwards.
+    await get_db().read_markers.update_one(
+        {"username": username, "roomId": room_id}, {"$max": {"messageId": message_id}}, upsert=True
+    )
+
+
+async def message_in_room(room_id: str, message_id: str) -> ObjectId | None:
+    try:
+        oid = ObjectId(message_id)
+    except (InvalidId, TypeError):
+        return None
+    found = await get_db().messages.find_one({"_id": oid, "roomId": room_id}, {"_id": 1})
+    return oid if found else None
+
+
+async def unread_counts(username: str) -> dict[str, int]:
+    """Messages from others after the user's read marker, per room; rooms with none are omitted."""
+    db = get_db()
+    counts: dict[str, int] = {}
+    async for room in db.rooms.find({"members": username}, {"_id": 1}):
+        room_id = str(room["_id"])
+        marker = await db.read_markers.find_one({"username": username, "roomId": room_id})
+        query: dict = {"roomId": room_id, "sender": {"$ne": username}}
+        if marker:
+            query["_id"] = {"$gt": marker["messageId"]}
+        count = await db.messages.count_documents(query)
+        if count:
+            counts[room_id] = count
+    return counts

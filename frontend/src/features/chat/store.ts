@@ -7,11 +7,14 @@ export type ChatState = {
   loaded: string[] // rooms whose full history arrived on this connection
   activeId: string
   pendingOpen: string | null // reqId of a dm.open we should select when it comes back
+  me: string
+  unread: Record<string, number>
   error: string
 }
-const initial = (): ChatState => ({ rooms: [], messages: {}, loaded: [], activeId: '', pendingOpen: null, error: '' })
+const initial = (): ChatState => ({ rooms: [], messages: {}, loaded: [], activeId: '', pendingOpen: null, me: '', unread: {}, error: '' })
 let state = initial()
 let sequence = 0
+let lastMarked: Record<string, string> = {} // roomId -> last message id we told the server about
 const listeners = new Set<() => void>()
 
 export function getChat(): ChatState { return state }
@@ -23,7 +26,24 @@ function update(changes: Partial<ChatState>): void {
   state = { ...state, ...changes }
   listeners.forEach((fn) => fn())
 }
-export function resetChat(): void { update(initial()) }
+export function resetChat(): void { lastMarked = {}; update(initial()) }
+
+const viewing = () => typeof document === 'undefined' || document.visibilityState === 'visible'
+// Mark the open room read, but only while the tab is visible, so background tabs keep their badge.
+export function markActiveRead(): void {
+  const roomId = state.activeId
+  if (!roomId || !viewing()) return
+  const list = state.messages[roomId] ?? []
+  const last = list[list.length - 1]
+  if (!last || !state.loaded.includes(roomId)) return
+  if (state.unread[roomId]) update({ unread: { ...state.unread, [roomId]: 0 } })
+  if (lastMarked[roomId] === last.id) return
+  if (send('read.mark', { roomId, messageId: last.id })) lastMarked[roomId] = last.id
+}
+function unreadFrom(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object') return {}
+  return Object.fromEntries(Object.entries(value).filter(([, n]) => Number.isInteger(n) && (n as number) > 0)) as Record<string, number>
+}
 
 function sortedRooms(rooms: Room[]): Room[] {
   return [...new Map(rooms.map((room) => [room.id, room])).values()]
@@ -38,7 +58,8 @@ export function receiveInit(frame: Frame): void {
   const rooms = sortedRooms(frame.rooms.filter(isRoom))
   const activeId = rooms.some((r) => r.id === state.activeId) ? state.activeId : ''
   // A new connection may have missed messages, so history is fetched again.
-  update({ rooms, loaded: [], activeId, pendingOpen: null })
+  lastMarked = {}
+  update({ rooms, loaded: [], activeId, pendingOpen: null, me: frame.me, unread: unreadFrom(frame.unread) })
   if (activeId) fetchHistory(activeId)
 }
 export function receiveRoom(frame: Frame): void {
@@ -53,6 +74,7 @@ export function receiveRoomRemoved(frame: Frame): void {
   update({
     rooms: state.rooms.filter((r) => r.id !== frame.roomId), messages,
     loaded: state.loaded.filter((id) => id !== frame.roomId),
+    unread: Object.fromEntries(Object.entries(state.unread).filter(([id]) => id !== frame.roomId)),
     activeId: state.activeId === frame.roomId ? '' : state.activeId,
   })
 }
@@ -61,7 +83,12 @@ export function receiveMessage(frame: Frame): void {
   if (!isMessage(message)) return
   const list = state.messages[message.roomId] ?? []
   if (list.some((m) => m.id === message.id)) return
-  update({ messages: { ...state.messages, [message.roomId]: [...list, message] } })
+  const unseen = message.sender !== state.me && !(message.roomId === state.activeId && viewing())
+  update({
+    messages: { ...state.messages, [message.roomId]: [...list, message] },
+    ...(unseen ? { unread: { ...state.unread, [message.roomId]: (state.unread[message.roomId] ?? 0) + 1 } } : {}),
+  })
+  if (message.roomId === state.activeId) markActiveRead()
 }
 export function receiveHistory(frame: Frame): void {
   if (typeof frame.roomId !== 'string' || !Array.isArray(frame.messages)) return
@@ -69,6 +96,7 @@ export function receiveHistory(frame: Frame): void {
     messages: { ...state.messages, [frame.roomId]: frame.messages.filter(isMessage) },
     loaded: [...new Set([...state.loaded, frame.roomId])],
   })
+  if (frame.roomId === state.activeId) markActiveRead()
 }
 export function receiveError(frame: Frame): void {
   if (!state.pendingOpen || frame.reqId !== state.pendingOpen) return
@@ -81,6 +109,7 @@ export function connectionChanged(): void {
 export function selectRoom(roomId: string): void {
   update({ activeId: roomId, error: '' })
   fetchHistory(roomId)
+  markActiveRead()
 }
 export function openPrivateChat(username: string): boolean {
   const existing = state.rooms.find((r) => r.kind === 'private' && r.name === username)
@@ -111,3 +140,4 @@ on('message.new', receiveMessage)
 on('history', receiveHistory)
 on('error', receiveError)
 subscribeConnection(connectionChanged)
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', markActiveRead)
