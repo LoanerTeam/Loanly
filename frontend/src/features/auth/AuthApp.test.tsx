@@ -3,7 +3,7 @@ import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { AuthApp } from './AuthApp'
+import { AuthApp, AuthForm } from './AuthApp'
 import { apiRequest } from './api'
 import { readToken, saveToken } from './session'
 import { createAuthStore } from './store'
@@ -67,11 +67,13 @@ test('register uses its endpoint, masks passwords, and prevents duplicate submis
   expect(password.autocomplete).toBe('new-password')
   await user.type(screen.getByLabelText('Username'), 'alice')
   await user.type(password, 'correct password')
+  await user.type(screen.getByLabelText('Confirm password'), 'correct password')
   await user.click(screen.getByRole('button', { name: 'Register' }))
   expect((screen.getByRole('button', { name: 'Please wait…' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.submit(password.closest('form')!)
   expect(fetchMock).toHaveBeenCalledTimes(1)
   expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/register')
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ username: 'alice', password: 'correct password' })
   await act(async () => resolve(response({ token: 'new-jwt' }, 201)))
   expect(await screen.findByRole('region', { name: 'Chat' })).toBeTruthy()
 })
@@ -87,6 +89,107 @@ test('credential errors keep chat guarded and clear the entered password', async
   expect((screen.getByLabelText('Password') as HTMLInputElement).value).toBe('')
   expect(screen.queryByRole('region', { name: 'Chat' })).toBeNull()
   expect(readToken()).toBe('')
+})
+
+test('registration requires confirmation and blocks mismatches until both passwords match', async () => {
+  fetchMock.mockResolvedValueOnce(response({ token: 'new-jwt' })).mockResolvedValueOnce(response(profile))
+  renderApp()
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Create an account' }))
+  await user.type(screen.getByLabelText('Username'), 'alice')
+  await user.type(screen.getByLabelText('Password'), 'correct password')
+  const confirmation = screen.getByLabelText('Confirm password') as HTMLInputElement
+  expect(confirmation.required).toBe(true)
+  expect(confirmation.autocomplete).toBe('new-password')
+  await user.click(screen.getByRole('button', { name: 'Register' }))
+  expect(fetchMock).not.toHaveBeenCalled()
+  await user.type(confirmation, 'different password')
+  await user.click(screen.getByRole('button', { name: 'Register' }))
+  expect(screen.getByRole('alert').textContent).toBe('Passwords do not match.')
+  expect(confirmation.getAttribute('aria-invalid')).toBe('true')
+  expect(confirmation.getAttribute('aria-describedby')).toBe(screen.getByRole('alert').id)
+  expect(fetchMock).not.toHaveBeenCalled()
+  await user.clear(confirmation)
+  await user.type(confirmation, 'correct password')
+  expect(screen.queryByRole('alert')).toBeNull()
+  // Editing the original password must revalidate the confirmation too.
+  await user.type(screen.getByLabelText('Password'), '!')
+  expect(screen.getByRole('alert').textContent).toBe('Passwords do not match.')
+  await user.type(confirmation, '!')
+  await user.click(screen.getByRole('button', { name: 'Register' }))
+  expect(await screen.findByRole('region', { name: 'Chat' })).toBeTruthy()
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ username: 'alice', password: 'correct password!' })
+})
+
+test('eye buttons toggle each field independently without changing values or submitting', async () => {
+  const onSubmit = vi.fn(async () => {})
+  render(<AuthForm busy={false} error="" onSubmit={onSubmit} />)
+  const user = userEvent.setup()
+  const password = screen.getByLabelText('Password') as HTMLInputElement
+  expect(screen.queryByLabelText('Confirm password')).toBeNull()
+  await user.type(password, 'login password')
+  await user.click(screen.getByRole('button', { name: 'Show password' }))
+  expect(password.type).toBe('text')
+  expect(password.value).toBe('login password')
+  const hide = screen.getByRole('button', { name: 'Hide password' })
+  expect(hide.getAttribute('aria-pressed')).toBe('true')
+  expect(hide.getAttribute('aria-controls')).toBe(password.id)
+  // Native buttons remain operable from the keyboard.
+  await user.keyboard('{Enter}')
+  expect(password.type).toBe('password')
+  await user.click(screen.getByRole('button', { name: 'Create an account' }))
+  const confirmation = screen.getByLabelText('Confirm password') as HTMLInputElement
+  await user.type(password, 'register password')
+  await user.type(confirmation, 'register password')
+  await user.click(screen.getByRole('button', { name: 'Show confirm password' }))
+  expect(confirmation.type).toBe('text')
+  expect(password.type).toBe('password')
+  await user.click(screen.getByRole('button', { name: 'Show password' }))
+  expect(password.type).toBe('text')
+  await user.click(screen.getByRole('button', { name: 'Hide confirm password' }))
+  expect(confirmation.type).toBe('password')
+  expect(confirmation.value).toBe('register password')
+  expect(onSubmit).not.toHaveBeenCalled()
+})
+
+test('switching auth modes clears passwords, mismatch errors and visibility', async () => {
+  render(<AuthForm busy={false} error="" onSubmit={vi.fn(async () => {})} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Create an account' }))
+  await user.type(screen.getByLabelText('Username'), 'alice')
+  await user.type(screen.getByLabelText('Password'), 'correct password')
+  await user.type(screen.getByLabelText('Confirm password'), 'different password')
+  await user.click(screen.getByRole('button', { name: 'Show password' }))
+  await user.click(screen.getByRole('button', { name: 'Show confirm password' }))
+  await user.click(screen.getByRole('button', { name: 'Register' }))
+  expect(screen.getByRole('alert')).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: 'Already registered? Sign in' }))
+  expect((screen.getByLabelText('Password') as HTMLInputElement).value).toBe('')
+  expect((screen.getByLabelText('Password') as HTMLInputElement).type).toBe('password')
+  expect(screen.queryByLabelText('Confirm password')).toBeNull()
+  expect(screen.queryByRole('alert')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Create an account' }))
+  expect((screen.getByLabelText('Confirm password') as HTMLInputElement).value).toBe('')
+  expect((screen.getByLabelText('Confirm password') as HTMLInputElement).type).toBe('password')
+})
+
+test('failed registration clears and masks both password fields', async () => {
+  fetchMock.mockResolvedValue(response({ error: 'name_taken', detail: 'That Username is already registered.' }, 409))
+  renderApp()
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Create an account' }))
+  await user.type(screen.getByLabelText('Username'), 'alice')
+  await user.type(screen.getByLabelText('Password'), 'correct password')
+  await user.type(screen.getByLabelText('Confirm password'), 'correct password')
+  await user.click(screen.getByRole('button', { name: 'Show password' }))
+  await user.click(screen.getByRole('button', { name: 'Show confirm password' }))
+  await user.click(screen.getByRole('button', { name: 'Register' }))
+  expect((await screen.findByRole('alert')).textContent).toContain('already registered')
+  for (const label of ['Password', 'Confirm password']) {
+    const input = screen.getByLabelText(label) as HTMLInputElement
+    expect(input.value).toBe('')
+    expect(input.type).toBe('password')
+  }
 })
 
 test('expired stored token returns to sign in and is removed', async () => {

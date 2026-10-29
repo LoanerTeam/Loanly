@@ -1,6 +1,7 @@
-import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useId, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import { createAuthStore, type AuthState } from './store'
 import type { AuthMode } from './api'
+import { PasswordField } from './PasswordField'
 
 export function AuthGuard({ state, children, retry, logout }: {
   state: AuthState; children: ReactNode; retry: () => void; logout: () => void
@@ -21,13 +22,23 @@ export function AuthForm({ busy, error, onSubmit }: {
   const [mode, setMode] = useState<AuthMode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const passwordHelpId = useId()
+  const confirmationErrorId = useId()
+  const mismatch = submitted && mode === 'register' && password !== confirmPassword
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (busy) return
     setSubmitted(true)
+    if (mode === 'register' && password !== confirmPassword) return
     await onSubmit(mode, username, password)
     setPassword('')
+    setConfirmPassword('')
+    setShowPassword(false)
+    setShowConfirmation(false)
   }
   return <form className="mt-6 space-y-4" onSubmit={submit}>
     <h2 className="text-xl font-semibold">{mode === 'login' ? 'Sign in' : 'Create account'}</h2>
@@ -38,17 +49,23 @@ export function AuthForm({ busy, error, onSubmit }: {
         aria-describedby="username-help" />
     </label>
     <p id="username-help" className="text-sm text-slate-500">3–20 lowercase letters, numbers or underscores.</p>
-    <label className="block">Password
-      <input className="mt-2 w-full rounded-lg border border-slate-300 p-2" type="password" value={password}
-        onChange={(event) => setPassword(event.target.value)} minLength={8} required disabled={busy}
-        autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
-    </label>
-    <p className="text-sm text-slate-500">At least 8 characters.</p>
+    <PasswordField label="Password" value={password} onChange={setPassword} visible={showPassword}
+      onToggle={() => setShowPassword(!showPassword)} disabled={busy} describedBy={passwordHelpId}
+      autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+    <p id={passwordHelpId} className="text-sm text-slate-500">At least 8 characters.</p>
+    {mode === 'register' && <>
+      <PasswordField label="Confirm password" value={confirmPassword} onChange={setConfirmPassword}
+        visible={showConfirmation} onToggle={() => setShowConfirmation(!showConfirmation)}
+        disabled={busy} autoComplete="new-password" invalid={mismatch}
+        describedBy={mismatch ? confirmationErrorId : undefined} />
+      {mismatch && <p id={confirmationErrorId} role="alert" className="text-sm text-red-600">Passwords do not match.</p>}
+    </>}
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
     <button className="w-full rounded-lg bg-slate-800 px-4 py-2 text-white disabled:opacity-50"
       type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Register'}</button>
     <button type="button" className="w-full text-sm underline" disabled={busy} onClick={() => {
-      setMode(mode === 'login' ? 'register' : 'login'); setPassword(''); setSubmitted(false)
+      setMode(mode === 'login' ? 'register' : 'login'); setPassword(''); setConfirmPassword('')
+      setShowPassword(false); setShowConfirmation(false); setSubmitted(false)
     }}>{mode === 'login' ? 'Create an account' : 'Already registered? Sign in'}</button>
     {submitted && !busy && error && <p className="text-sm text-slate-500">Check your details and try again.</p>}
   </form>
