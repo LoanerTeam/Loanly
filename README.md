@@ -115,3 +115,19 @@ from Bob returns `forbidden`. After confirming, deletion removes the Group, its
 messages and its read markers, and the Group disappears for every user.
 
 `backend/tests/test_group_leave_delete.py` covers each rule with plain `pytest`.
+
+## F8: summarize Unread Messages
+
+Set `GEMINI_API_KEY` in the root `.env` (create one at https://aistudio.google.com/apikey;
+never commit it). `GEMINI_MODEL` defaults to `gemini-3.8-flash`. If Google reports
+that model as busy or retired, set another one such as `gemini-3.5-flash` in `.env`.
+
+Bob stays in another room while Alice sends a few messages to their Private Room or a
+shared Group. When Bob opens the room, the unread badge clears as usual and the room
+shows **Summarize N unread** above the messages. It summarizes exactly those Unread
+Messages, at most the latest 200. The summary is shown only to Bob and is not stored.
+Rooms opened with no Unread Messages show no button.
+Without a key, with the quota used up, or while the model is busy, the button shows a
+friendly error and chat keeps working.
+
+`backend/tests/test_ai_summarize.py` mocks Gemini, so `pytest` needs no key.

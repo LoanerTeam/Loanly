@@ -14,6 +14,7 @@ import { useChat } from './features/chat/useChat'
 import { ChatRoom } from './features/chat/ChatRoom'
 import { RoomList } from './features/chat/RoomList'
 import { AuthApp } from './features/auth/AuthApp'
+import { RoomAiBar } from './ai/RoomAiBar'
 
 // AuthApp supplies the verified JWT; chat features share this existing view.
 export function PresenceApp({ token, onDisconnect }: { token: string; onDisconnect: () => void }) {
@@ -52,6 +53,8 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
           </aside>
           {chat.active
             ? <ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
+                toolbar={<RoomAiBar key={`${chat.active.id}:${chat.catchUp?.lastId ?? ''}`} room={chat.active}
+                  messages={chat.activeMessages} me={me} catchUp={chat.catchUp} token={token} />}
                 onSend={(text) => sendMessage(chat.active!.id, text)} />
             : <section className="rounded-2xl border border-slate-200 bg-white p-8">
                 <h2 className="text-xl font-semibold">Welcome{me ? `, ${me}` : ''}</h2>
