@@ -7,6 +7,17 @@ import { RoomList } from './RoomList'
 const room = { id: 'r1', kind: 'private' as const, name: 'bob', members: ['alice', 'bob'], creator: null }
 const message = (sender: string, text: string) => ({ id: sender + text, roomId: 'r1', sender, text, ts: '2026-01-01T10:00:00Z' })
 
+test('unread divider and per-message actions render together', () => {
+  const unread = message('bob', 'hello')
+  const html = renderToStaticMarkup(
+    <ChatRoom room={room} me="alice" onSend={() => true} messages={[unread]}
+      firstUnreadId={unread.id} messageActions={(entry) => <button>Translate {entry.text}</button>} />,
+  )
+  expect(html).toContain('aria-label="Unread messages"')
+  expect(html).toContain('Translate hello')
+  expect(html.indexOf('aria-label="Unread messages"')).toBeLessThan(html.indexOf('Translate hello'))
+})
+
 test('chat room has a message window and a chat box, and shows incoming and own messages', () => {
   const html = renderToStaticMarkup(
     <ChatRoom room={room} me="alice" onSend={() => true} messages={[message('bob', 'hello'), message('alice', 'hi bob')]} />,

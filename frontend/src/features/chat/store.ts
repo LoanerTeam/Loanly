@@ -22,6 +22,14 @@ let sequence = 0
 let lastMarked: Record<string, string> = {} // roomId -> last message id we told the server about
 const listeners = new Set<() => void>()
 
+// Oldest Unread Message of the room as it was when opened: the count-th last message from
+// others up to the newest one seen then. Empty when the room had nothing Unread.
+export function firstUnreadId(messages: Message[], me: string, catchUp: CatchUp | null, roomId: string): string {
+  if (!catchUp || catchUp.roomId !== roomId || catchUp.count <= 0) return ''
+  const end = messages.findIndex((m) => m.id === catchUp.lastId)
+  const fromOthers = messages.slice(0, end + 1).filter((m) => m.sender !== me)
+  return end < 0 ? '' : fromOthers[Math.max(0, fromOthers.length - catchUp.count)]?.id ?? ''
+}
 export function getChat(): ChatState { return state }
 export function subscribeChat(fn: () => void): () => void {
   listeners.add(fn)
