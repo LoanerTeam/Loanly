@@ -5,7 +5,7 @@ import { usePresence } from './features/presence/usePresence'
 import { UserList } from './features/presence/UserList'
 import { ConnectionStatus } from './features/presence/ConnectionStatus'
 import { readDevSession, saveDevSession, clearDevSession } from './features/presence/session'
-import { resetGroups } from './features/groups/store'
+import { deleteGroup, leaveGroup, resetGroups } from './features/groups/store'
 import { useGroups } from './features/groups/useGroups'
 import { GroupList } from './features/groups/GroupList'
 import { CreateGroupForm } from './features/groups/CreateGroupForm'
@@ -18,7 +18,7 @@ import { AuthApp } from './features/auth/AuthApp'
 // AuthApp supplies the verified JWT; chat features share this existing view.
 export function PresenceApp({ token, onDisconnect }: { token: string; onDisconnect: () => void }) {
   const { me, users, status } = usePresence()
-  const { groups, connected } = useGroups()
+  const { groups, connected, acting, actionError } = useGroups()
   const chat = useChat()
   useEffect(() => {
     resetPresence()
@@ -45,7 +45,8 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
             </div>
             <div className="mt-6 border-t border-slate-200 pt-4">
               <h2 className="mb-3 font-semibold">Groups</h2>
-              <GroupList groups={groups} me={me} joining={chat.joining} connected={connected} onOpen={openGroup} />
+              <GroupList groups={groups} me={me} joining={chat.joining} acting={acting} connected={connected}
+                error={actionError} onOpen={openGroup} onLeave={leaveGroup} onDelete={deleteGroup} />
               <CreateGroupForm />
             </div>
           </aside>

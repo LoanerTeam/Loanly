@@ -78,12 +78,19 @@ export function receiveGroup(frame: Frame): void {
 }
 export function receiveRoomRemoved(frame: Frame): void {
   if (typeof frame.roomId !== 'string') return
-  const messages = Object.fromEntries(Object.entries(state.messages).filter(([id]) => id !== frame.roomId))
+  dropRoom(frame.roomId)
+}
+// A deleted Group disappears for its Members the same way as a room they left.
+export function receiveGroupRemoved(frame: Frame): void {
+  if (typeof frame.groupId === 'string') dropRoom(frame.groupId)
+}
+function dropRoom(roomId: string): void {
+  const messages = Object.fromEntries(Object.entries(state.messages).filter(([id]) => id !== roomId))
   update({
-    rooms: state.rooms.filter((r) => r.id !== frame.roomId), messages,
-    loaded: state.loaded.filter((id) => id !== frame.roomId),
-    unread: Object.fromEntries(Object.entries(state.unread).filter(([id]) => id !== frame.roomId)),
-    activeId: state.activeId === frame.roomId ? '' : state.activeId,
+    rooms: state.rooms.filter((r) => r.id !== roomId), messages,
+    loaded: state.loaded.filter((id) => id !== roomId),
+    unread: Object.fromEntries(Object.entries(state.unread).filter(([id]) => id !== roomId)),
+    activeId: state.activeId === roomId ? '' : state.activeId,
   })
 }
 export function receiveMessage(frame: Frame): void {
@@ -157,6 +164,7 @@ on('init', receiveInit)
 on('room.upsert', receiveRoom)
 on('room.removed', receiveRoomRemoved)
 on('group.upsert', receiveGroup)
+on('group.removed', receiveGroupRemoved)
 on('message.new', receiveMessage)
 on('history', receiveHistory)
 on('error', receiveError)
