@@ -14,6 +14,7 @@ def clear_presence(monkeypatch):
     monkeypatch.setattr(presence, "presence_lock", lock)
     monkeypatch.setattr(groups, "ensure_indexes", AsyncMock())
     monkeypatch.setattr(presence, "list_groups", AsyncMock(return_value=[]))
+    monkeypatch.setattr(presence, "list_private_rooms", AsyncMock(return_value=[]))
     connections.clear()
     dev_users.clear()
     yield

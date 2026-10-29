@@ -9,16 +9,22 @@ import { resetGroups } from './features/groups/store'
 import { useGroups } from './features/groups/useGroups'
 import { GroupList } from './features/groups/GroupList'
 import { CreateGroupForm } from './features/groups/CreateGroupForm'
+import { openPrivateChat, resetChat, selectRoom, sendMessage } from './features/chat/store'
+import { useChat } from './features/chat/useChat'
+import { ChatRoom } from './features/chat/ChatRoom'
+import { RoomList } from './features/chat/RoomList'
 
 // F1 can render this with its JWT; the username form is development-only.
 export function PresenceApp({ token, onDisconnect }: { token: string; onDisconnect: () => void }) {
   const { me, users, status } = usePresence()
   const { groups } = useGroups()
+  const chat = useChat()
   useEffect(() => {
     resetPresence()
     resetGroups()
+    resetChat()
     connect(token)
-    return () => { disconnect(); resetPresence(); resetGroups() }
+    return () => { disconnect(); resetPresence(); resetGroups(); resetChat() }
   }, [token])
   return (
     <main className="min-h-screen bg-slate-50 p-6 text-slate-800">
@@ -30,18 +36,26 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
         <div className="grid gap-6 md:grid-cols-[280px_1fr]">
           <aside className="rounded-2xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 font-semibold">Users <span className="text-sm font-normal text-slate-500">{users.filter((u) => u.online).length} online</span></h2>
-            <UserList users={users} me={me} />
+            <UserList users={users} me={me} onSelect={openPrivateChat} />
             {!users.length && <p className="px-3 py-2 text-sm text-slate-500">Waiting for user list…</p>}
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <h2 className="mb-3 font-semibold">Chats</h2>
+              <RoomList rooms={chat.rooms} activeId={chat.activeId} onSelect={selectRoom} />
+            </div>
             <div className="mt-6 border-t border-slate-200 pt-4">
               <h2 className="mb-3 font-semibold">Groups</h2>
               <GroupList groups={groups} me={me} />
               <CreateGroupForm />
             </div>
           </aside>
-          <section className="rounded-2xl border border-slate-200 bg-white p-8">
-            <h2 className="text-xl font-semibold">Welcome{me ? `, ${me}` : ''}</h2>
-            <p className="mt-2 text-slate-500">See who is online in the user list.</p>
-          </section>
+          {chat.active
+            ? <ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
+                onSend={(text) => sendMessage(chat.active!.id, text)} />
+            : <section className="rounded-2xl border border-slate-200 bg-white p-8">
+                <h2 className="text-xl font-semibold">Welcome{me ? `, ${me}` : ''}</h2>
+                <p className="mt-2 text-slate-500">Pick a user to start a private chat.</p>
+                {chat.error && <p role="alert" className="mt-2 text-sm text-red-600">{chat.error}</p>}
+              </section>}
         </div>
       </div>
     </main>

@@ -23,10 +23,20 @@ class ChatError(Exception):
 
 
 _ids = iter(range(1, 1 << 62))
+
 connections: dict[str, list[Connection]] = {}
 # Serialize snapshots with presence changes so init is always the first frame.
 presence_lock = asyncio.Lock()
 dev_users: set[str] = set()
+
+
+async def send_to(username: str, type: str, **payload) -> None:
+    """Send a frame to every live connection of a user (all tabs); no-op if offline."""
+    for conn in list(connections.get(username, [])):
+        try:
+            await conn.send(type, **payload)
+        except (OSError, RuntimeError, TimeoutError, WebSocketDisconnect):
+            pass  # that tab is gone; its own receive loop cleans it up
 
 
 def _remove(conn: Connection) -> bool:

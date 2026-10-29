@@ -5,3 +5,4 @@ httpx
 ruff
 bandit
 pip-audit
+mongomock-motor
