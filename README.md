@@ -4,18 +4,33 @@ Chat web app for a Computer Networks course (socket programming). Start with `AG
 
 ## Run locally
 ```
-cp .env.example .env            # set DEV_AUTH=1 to skip login while developing
+cp .env.example .env            # set JWT_SECRET to a generated random value; keep DEV_AUTH=0
 cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt   # Linux/Mac: .venv/bin/pip
-.venv/Scripts/uvicorn app.main:app --reload        # API + WebSocket on :8000
+.venv/Scripts/uvicorn app.main:app --reload --env-file ../.env  # API + WebSocket on :8000
 cd frontend && npm install && npm run dev           # UI on :5173, proxies /api and /ws to :8000
 ```
+Run the backend and frontend commands in separate terminals from their respective
+directories. MongoDB must be available at `MONGODB_URI` (see the Docker example below).
+Generate a signing secret with
+`python -c "import secrets; print(secrets.token_urlsafe(48))"`, then put it in the
+root `.env` as `JWT_SECRET`. Real auth requires at least 32 bytes and startup
+creates a unique Username index. Do not commit your `.env`.
+
+Register or sign in in the browser. Tokens are stored per tab and verified on
+reload. Log out disconnects that tab and clears its account and chat data.
+For a production-style local check, run `npm run build` in `frontend/` and open
+`http://localhost:8000`; restart the backend after the first build if necessary.
+Auth behavior, errors, and tests are described in [docs/F1-AUTH.md](docs/F1-AUTH.md).
 Checks (the gate in `AGENTS.md`): `pytest`, `ruff check .`, `bandit -r app`, `pip-audit` in `backend/`; `npm test`, `npm run lint`, `npm audit --omit=dev` in `frontend/`.
 
 ## F2: connection and online users
 
-Until F1 lands, start the backend with `DEV_AUTH=1` in its environment
-(e.g. `DEV_AUTH=1 .venv/bin/uvicorn app.main:app --reload` from `backend/`).
-Start Vite from `frontend/` with `npm run dev`; its development-only form accepts
+For development without accounts, start the backend with `DEV_AUTH=1` in its
+environment. Also set `VITE_DEV_AUTH=1` in the frontend terminal before starting
+Vite, or copy `frontend/.env.example` to the git-ignored `frontend/.env` and set it
+there. On PowerShell use
+`$env:VITE_DEV_AUTH='1'; npm run dev` from `frontend/`. Both flags are explicit:
+normal `npm run dev` shows real Login/Register. The development-only form accepts
 usernames such as `alice` and `bob`. For two computers, run Vite with
 `npm run dev -- --host 0.0.0.0` and open the host computer's LAN address on port
 5173. Both `/ws` connections go through Vite's backend proxy.
@@ -25,9 +40,10 @@ tab closes, and closing Bob's last tab marks Bob offline for Alice. Restart the
 backend and verify automatic reconnect and a fresh user list. Development users
 are kept only in memory; registered users will come from MongoDB after F1.
 
-F1 can pass its JWT to `PresenceApp` and call
-`await announce_new_user(username)` from `app.chat.hub` after saving a new user.
-The production build does not expose the development username form.
+Auth now supplies its verified JWT to `PresenceApp` and calls
+`await announce_new_user(username)` after saving a new user. Disable both
+development flags for real-auth integration. The production build always uses
+real Login/Register and does not expose the development Username form.
 
 ## F4: create and list Groups
 
@@ -40,7 +56,8 @@ docker run -d --name loanly-mongo -p 127.0.0.1:27017:27017 -v loanly-mongo-data:
 ```
 
 From `backend/`, activate your virtual environment and run
-`uvicorn app.main:app --reload --env-file .env` with `DEV_AUTH=1` in that file.
+`uvicorn app.main:app --reload --env-file ../.env` with `DEV_AUTH=1` in the root file
+and the frontend development flag enabled as described above.
 The server ensures a unique `(creator, name)` Group index at startup and refuses to start if
 MongoDB is unavailable or existing data prevents index creation. Group names
 are trimmed and case-sensitive (`team` and `Team` are distinct). A Creator cannot

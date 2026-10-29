@@ -13,6 +13,9 @@ def clear_presence(monkeypatch):
     monkeypatch.setattr(hub, "presence_lock", lock)
     monkeypatch.setattr(presence, "presence_lock", lock)
     monkeypatch.setattr(groups, "ensure_indexes", AsyncMock())
+    # Ordinary chat unit tests do not need an account database or JWT configuration.
+    # Application-auth integration tests restore the real initializer explicitly.
+    monkeypatch.setattr("app.main.initialize_auth", AsyncMock())
     monkeypatch.setattr(presence, "list_groups", AsyncMock(return_value=[]))
     monkeypatch.setattr(presence, "list_private_rooms", AsyncMock(return_value=[]))
     monkeypatch.setattr(presence, "unread_counts", AsyncMock(return_value={}))

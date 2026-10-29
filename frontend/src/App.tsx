@@ -13,8 +13,9 @@ import { openPrivateChat, resetChat, selectRoom, sendMessage } from './features/
 import { useChat } from './features/chat/useChat'
 import { ChatRoom } from './features/chat/ChatRoom'
 import { RoomList } from './features/chat/RoomList'
+import { AuthApp } from './features/auth/AuthApp'
 
-// F1 can render this with its JWT; the username form is development-only.
+// AuthApp supplies the verified JWT; chat features share this existing view.
 export function PresenceApp({ token, onDisconnect }: { token: string; onDisconnect: () => void }) {
   const { me, users, status } = usePresence()
   const { groups } = useGroups()
@@ -31,7 +32,7 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
       <div className="mx-auto max-w-5xl">
         <header className="mb-8 flex items-center justify-between gap-4">
           <div><h1 className="text-3xl font-semibold">Loanly</h1><ConnectionStatus status={status} /></div>
-          <button className="rounded-lg border border-slate-300 px-4 py-2" onClick={onDisconnect}>Disconnect</button>
+          <button className="rounded-lg border border-slate-300 px-4 py-2" onClick={onDisconnect}>Log out</button>
         </header>
         <div className="grid gap-6 md:grid-cols-[280px_1fr]">
           <aside className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -61,7 +62,7 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
     </main>
   )
 }
-export default function App() {
+function DevApp() {
   const [token, setToken] = useState(() => import.meta.env.DEV ? readDevSession() : '')
   const [username, setUsername] = useState('')
   if (token) return <PresenceApp token={token} onDisconnect={() => {
@@ -86,4 +87,9 @@ export default function App() {
       </div>
     </main>
   )
+}
+
+export default function App() {
+  if (import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH === '1') return <DevApp />
+  return <AuthApp renderChat={(token, logout) => <PresenceApp token={token} onDisconnect={logout} />} />
 }

@@ -4,19 +4,22 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.auth.setup import initialize_auth, install_auth
 from app.chat import groups
 from app.chat.ws import router as ws_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await initialize_auth()
     await groups.ensure_indexes()
     yield
 
 
 app = FastAPI(title="Loanly", lifespan=lifespan)
+install_auth(app)
 app.include_router(ws_router)
-# F1: app.include_router(auth_router, prefix="/api")   F8-F11: app.include_router(ai_router, prefix="/api/ai")
+# F8-F11: app.include_router(ai_router, prefix="/api/ai")
 
 
 @app.get("/api/health")
