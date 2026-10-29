@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import { createAuthStore, type AuthState } from './store'
-import type { AuthMode } from './api'
+import type { AuthMode, Profile } from './api'
 import { PasswordField } from './PasswordField'
 
 export function AuthGuard({ state, children, retry, logout }: {
@@ -72,14 +72,14 @@ export function AuthForm({ busy, error, onSubmit }: {
 }
 
 export function AuthApp({ renderChat }: {
-  renderChat: (token: string, logout: () => void) => ReactNode
+  renderChat: (token: string, logout: () => void, profile: Profile) => ReactNode
 }) {
   const [store] = useState(createAuthStore)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   useEffect(() => store.start(), [store])
   if (state.status === 'authenticated') {
     return <AuthGuard state={state} retry={() => void store.restore()} logout={() => store.logout()}>
-      {renderChat(state.token, () => store.logout())}
+      {state.user && renderChat(state.token, () => store.logout(), state.user)}
     </AuthGuard>
   }
   return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-800">
