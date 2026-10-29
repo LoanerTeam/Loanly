@@ -2,8 +2,8 @@ import { beforeEach, expect, test, vi } from 'vitest'
 const client = vi.hoisted(() => ({ status: 'connected', send: vi.fn() }))
 vi.mock('../../ws/client', async (importOriginal) => ({ ...await importOriginal<typeof import('../../ws/client')>(), getConnectionStatus: () => client.status, send: client.send, on: vi.fn(), subscribeConnection: vi.fn() }))
 import {
-  connectionChanged, getChat, openPrivateChat, receiveError, receiveHistory, receiveInit, receiveMessage,
-  receiveRoom, receiveRoomRemoved, resetChat, selectRoom, sendMessage,
+  connectionChanged, getChat, openGroup, openPrivateChat, receiveError, receiveGroup, receiveHistory, receiveInit,
+  receiveMessage, receiveRoom, receiveRoomRemoved, resetChat, selectRoom, sendMessage,
 } from './store'
 
 const room = { id: 'r1', kind: 'private', name: 'bob', members: ['alice', 'bob'], creator: null }
@@ -95,4 +95,41 @@ test('removing a room clears it, its messages and the selection; disconnect forc
   expect(getChat().rooms).toEqual([])
   expect(getChat().messages.r1).toBeUndefined()
   expect(getChat().activeId).toBe('')
+})
+
+const team = { id: 'g1', kind: 'group', name: 'team', members: ['bob'], creator: 'bob' }
+test('joining a Group sends group.join once and opens the room when the reply arrives', () => {
+  init([])
+  expect(openGroup('g1')).toBe(true)
+  const reqId = getChat().pendingOpen
+  expect(client.send).toHaveBeenCalledWith('group.join', { groupId: 'g1', reqId })
+  expect(getChat().joining).toBe('g1')
+  expect(openGroup('g1')).toBe(false) // no duplicate join while pending
+  receiveRoom({ type: 'room.upsert', room: { ...team, members: ['bob', 'alice'] }, reqId })
+  expect(getChat()).toMatchObject({ activeId: 'g1', joining: '', pendingOpen: null })
+  expect(client.send).toHaveBeenCalledWith('history.get', { roomId: 'g1' })
+  client.send.mockClear()
+  expect(openGroup('g1')).toBe(true) // already a Member: just opens
+  expect(client.send).not.toHaveBeenCalledWith('group.join', expect.anything())
+})
+
+test('join errors and lost connections clear the pending join', () => {
+  init([])
+  openGroup('g1')
+  receiveError({ type: 'error', code: 'not_found', detail: 'no such Group', reqId: getChat().pendingOpen })
+  expect(getChat()).toMatchObject({ joining: '', pendingOpen: null, error: 'no such Group' })
+  openGroup('g1')
+  client.status = 'reconnecting'; connectionChanged()
+  expect(getChat().joining).toBe('')
+  client.send.mockReturnValue(false)
+  expect(openGroup('g1')).toBe(false)
+  expect(getChat().joining).toBe('')
+})
+
+test('group.upsert refreshes a joined room and ignores Groups I am not in', () => {
+  init([{ ...team, members: ['bob', 'alice'] }])
+  receiveGroup({ type: 'group.upsert', group: { ...team, members: ['bob', 'alice', 'carol'] } })
+  expect(getChat().rooms[0].members).toEqual(['bob', 'alice', 'carol'])
+  receiveGroup({ type: 'group.upsert', group: { ...team, id: 'g2' } })
+  expect(getChat().rooms).toHaveLength(1)
 })

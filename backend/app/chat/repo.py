@@ -64,6 +64,11 @@ async def list_messages(room_id: str) -> list[dict]:
     return await get_db().messages.find({"roomId": room_id}).sort("_id", 1).to_list(None)
 
 
+async def latest_message_id(room_id: str) -> ObjectId | None:
+    found = await get_db().messages.find_one({"roomId": room_id}, {"_id": 1}, sort=[("_id", -1)])
+    return found["_id"] if found else None
+
+
 async def list_private_rooms(username: str) -> list[dict]:
     cursor = get_db().rooms.find({"kind": "private", "members": username})
     return [room_dto(room, username) async for room in cursor]
