@@ -40,7 +40,7 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
             {!users.length && <p className="px-3 py-2 text-sm text-slate-500">Waiting for user list…</p>}
             <div className="mt-6 border-t border-slate-200 pt-4">
               <h2 className="mb-3 font-semibold">Chats</h2>
-              <RoomList rooms={chat.rooms} activeId={chat.activeId} onSelect={selectRoom} />
+              <RoomList rooms={chat.rooms} activeId={chat.activeId} unread={chat.unread} onSelect={selectRoom} />
             </div>
             <div className="mt-6 border-t border-slate-200 pt-4">
               <h2 className="mb-3 font-semibold">Groups</h2>

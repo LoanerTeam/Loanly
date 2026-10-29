@@ -1,6 +1,11 @@
 import type { Room } from './types'
 
-export function RoomList({ rooms, activeId, onSelect }: { rooms: Room[]; activeId: string; onSelect: (id: string) => void }) {
+export function RoomList({ rooms, activeId, unread = {}, onSelect }: {
+  rooms: Room[]
+  activeId: string
+  unread?: Record<string, number>
+  onSelect: (id: string) => void
+}) {
   if (!rooms.length) return <p className="px-3 py-2 text-sm text-slate-500">No chats yet. Pick a user to start one.</p>
   return (
     <ul className="space-y-1" aria-label="Chats">
@@ -14,6 +19,11 @@ export function RoomList({ rooms, activeId, onSelect }: { rooms: Room[]; activeI
           >
             {room.name}
             <span className="ml-2 text-xs opacity-70">{room.kind === 'group' ? 'group' : 'private'}</span>
+            {!!unread[room.id] && (
+              <span className="ml-2 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white" aria-label={`${unread[room.id]} unread`}>
+                {unread[room.id]}
+              </span>
+            )}
           </button>
         </li>
       ))}
