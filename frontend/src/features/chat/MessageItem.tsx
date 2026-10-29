@@ -11,7 +11,7 @@ export function MessageItem({ message, me, actions }: { message: Message; me: st
         {/* React escapes text, so message content is never interpreted as HTML. */}
         <p className="whitespace-pre-wrap break-words">{message.text}</p>
       </div>
-      <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+      <div className={`mt-1 flex max-w-[75%] flex-col gap-1 text-xs text-slate-500 ${mine ? 'items-end' : 'items-start'}`}>
         <time dateTime={message.ts}>{new Date(message.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
         {actions}
       </div>

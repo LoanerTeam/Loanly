@@ -66,3 +66,37 @@ test('development Username form requires explicit opt-in and is excluded from pr
   expect(screen.queryByRole('button', { name: 'Connect' })).toBeNull()
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy()
 })
+
+test('restores translation preference on reload and wires message translation through REST', async () => {
+  saveToken('signed-jwt')
+  let language = 'th'
+  const fetch = vi.fn(async (url: string, options?: RequestInit) => {
+    if (url === '/api/ai/translate') return new Response(JSON.stringify({ translation: 'สวัสดี' }))
+    if (options?.method === 'PUT') language = JSON.parse(options.body as string).targetLang
+    return new Response(JSON.stringify({ username: 'alice', targetLang: language }))
+  })
+  vi.stubGlobal('fetch', fetch)
+  const first = render(<App />)
+  expect(await screen.findByRole('combobox')).toHaveProperty('value', 'th')
+  await userEvent.selectOptions(screen.getByRole('combobox'), 'ja')
+  await waitFor(() => expect(screen.getByRole('combobox')).toHaveProperty('value', 'ja'))
+  first.unmount()
+  render(<App />)
+  expect(await screen.findByRole('combobox')).toHaveProperty('value', 'ja')
+  const ws = Socket.instances.at(-1)!
+  const room = { id: 'r1', kind: 'private', name: 'bob', members: ['alice', 'bob'], creator: null }
+  await act(async () => ws.onmessage?.({ data: JSON.stringify({
+    type: 'init', me: 'alice', users: [], rooms: [room], groups: [], unread: {},
+  }) }))
+  await userEvent.click(screen.getByRole('button', { name: /bob/ }))
+  await act(async () => ws.onmessage?.({ data: JSON.stringify({
+    type: 'history', roomId: 'r1', messages: [
+      { id: 'm1', roomId: 'r1', sender: 'bob', text: 'Hello', ts: '2026-01-01T10:00:00Z' },
+    ],
+  }) }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Translate' }))
+  expect(await screen.findByText('สวัสดี')).toBeTruthy()
+  expect(fetch).toHaveBeenCalledWith('/api/ai/translate', expect.objectContaining({
+    body: JSON.stringify({ text: 'Hello', targetLang: 'ja' }),
+  }))
+})

@@ -15,9 +15,12 @@ import { ChatRoom } from './features/chat/ChatRoom'
 import { RoomList } from './features/chat/RoomList'
 import { AuthApp } from './features/auth/AuthApp'
 import { RoomAiBar } from './ai/RoomAiBar'
+import { TranslateMessage, TranslationTools } from './features/translate/TranslationTools'
 
 // AuthApp supplies the verified JWT; chat features share this existing view.
-export function PresenceApp({ token, onDisconnect }: { token: string; onDisconnect: () => void }) {
+export function PresenceApp({ token, onDisconnect, targetLang = 'en' }: {
+  token: string; onDisconnect: () => void; targetLang?: string
+}) {
   const { me, users, status } = usePresence()
   const { groups, connected, acting, actionError } = useGroups()
   const chat = useChat()
@@ -35,6 +38,7 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
           <div><h1 className="text-3xl font-semibold">Loanly</h1><ConnectionStatus status={status} /></div>
           <button className="rounded-lg border border-slate-300 px-4 py-2" onClick={onDisconnect}>Log out</button>
         </header>
+        <TranslationTools key={token} token={token} initialLanguage={targetLang}>
         <div className="grid gap-6 md:grid-cols-[280px_1fr]">
           <aside className="rounded-2xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 font-semibold">Users <span className="text-sm font-normal text-slate-500">{users.filter((u) => u.online).length} online</span></h2>
@@ -53,6 +57,7 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
           </aside>
           {chat.active
             ? <ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
+                messageActions={(message) => <TranslateMessage text={message.text} />}
                 toolbar={<RoomAiBar key={`${chat.active.id}:${chat.catchUp?.lastId ?? ''}`} room={chat.active}
                   messages={chat.activeMessages} me={me} catchUp={chat.catchUp} token={token} />}
                 firstUnreadId={firstUnreadId(chat.activeMessages, me, chat.catchUp, chat.active.id)}
@@ -63,6 +68,7 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
                 {chat.error && <p role="alert" className="mt-2 text-sm text-red-600">{chat.error}</p>}
               </section>}
         </div>
+        </TranslationTools>
       </div>
     </main>
   )
@@ -96,5 +102,5 @@ function DevApp() {
 
 export default function App() {
   if (import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH === '1') return <DevApp />
-  return <AuthApp renderChat={(token, logout) => <PresenceApp token={token} onDisconnect={logout} />} />
+  return <AuthApp renderChat={(token, logout, profile) => <PresenceApp token={token} onDisconnect={logout} targetLang={profile.targetLang} />} />
 }

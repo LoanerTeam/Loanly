@@ -41,7 +41,8 @@ Tick each box while watching both screens. Expected result is in the last column
 | Feature | Steps | Expected |
 |---|---|---|
 | Summarize unread | bob has 5+ unread in a room, clicks Summarize | A summary of exactly those messages; button hidden when 0 unread; with 200+ unread only the latest 200 are used |
-| Translate | Pick target language `th` in settings, press Translate on a message | Translation shown under the original, only to bob, not saved; setting survives reload |
+| Translate | Pick target language `th`, translate a message, reload and translate it again | Translation shown under the original only to bob; repeated requests reuse the per-user MongoDB cache without Gemini; setting survives reload |
+| Same-language text | Choose `th` for a Thai message, or `en` for a clearly English sentence, then Translate | Original text returned without MongoDB or Gemini; mixed or ambiguous text follows normal translation |
 | Text-to-speech | Press the speaker on a message | Audio plays |
 | Speech-to-text | Press the mic, speak, stop | Transcript fills the chat box, editable, not sent automatically |
 | Failure handling | Unset `GEMINI_API_KEY` or exhaust the quota | Each feature shows a friendly error; chat keeps working |

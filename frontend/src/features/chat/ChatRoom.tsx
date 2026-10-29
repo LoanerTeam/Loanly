@@ -3,12 +3,13 @@ import { MessageInput } from './MessageInput'
 import { MessageItem } from './MessageItem'
 import type { Message, Room } from './types'
 
-export function ChatRoom({ room, messages, me, error, toolbar, firstUnreadId = '', onSend }: {
+export function ChatRoom({ room, messages, me, error, toolbar, messageActions, firstUnreadId = '', onSend }: {
   room: Room
   messages: Message[]
   me: string
   error?: string
   toolbar?: ReactNode // attach point for room-level AI tools (summarize unread)
+  messageActions?: (message: Message) => ReactNode
   firstUnreadId?: string // the divider goes above this message
   onSend: (text: string) => boolean
 }) {
@@ -41,7 +42,7 @@ export function ChatRoom({ room, messages, me, error, toolbar, firstUnreadId = '
                 <span className="h-px flex-1 bg-red-300" /><span>Unread</span><span className="h-px flex-1 bg-red-300" />
               </li>
             )}
-            <MessageItem message={m} me={me} />
+            <MessageItem message={m} me={me} actions={messageActions?.(m)} />
           </Fragment>
         ))}
         {!messages.length && <li className="text-center text-sm text-slate-500">No messages yet. Say hello.</li>}

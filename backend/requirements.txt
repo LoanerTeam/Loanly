@@ -6,3 +6,4 @@ bcrypt
 pyjwt
 google-genai
 python-multipart
+langdetect==1.0.9

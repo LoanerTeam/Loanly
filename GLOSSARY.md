@@ -42,7 +42,7 @@ A Message in a Chat Room that arrived, from someone else, after that user's read
 An AI-written digest of a user's Unread Messages in one Chat Room.
 
 **Translation**
-An AI-written rendering of one Message in the user's chosen target language, shown to that user only and not stored.
+An AI-written rendering of one Message in the user's chosen target language, shown to that user only. Cached in MongoDB per user, exact message text, target language and model so repeated requests can reuse it; not sent as a chat Message.
 
 **Transcription**
 Text produced from a user's recorded speech, placed in the chat box for editing before it is sent.
