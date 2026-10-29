@@ -9,7 +9,7 @@ import { deleteGroup, leaveGroup, resetGroups } from './features/groups/store'
 import { useGroups } from './features/groups/useGroups'
 import { GroupList } from './features/groups/GroupList'
 import { CreateGroupForm } from './features/groups/CreateGroupForm'
-import { openGroup, openPrivateChat, resetChat, selectRoom, sendMessage } from './features/chat/store'
+import { firstUnreadId, openGroup, openPrivateChat, resetChat, selectRoom, sendMessage } from './features/chat/store'
 import { useChat } from './features/chat/useChat'
 import { ChatRoom } from './features/chat/ChatRoom'
 import { RoomList } from './features/chat/RoomList'
@@ -55,6 +55,7 @@ export function PresenceApp({ token, onDisconnect }: { token: string; onDisconne
             ? <ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
                 toolbar={<RoomAiBar key={`${chat.active.id}:${chat.catchUp?.lastId ?? ''}`} room={chat.active}
                   messages={chat.activeMessages} me={me} catchUp={chat.catchUp} token={token} />}
+                firstUnreadId={firstUnreadId(chat.activeMessages, me, chat.catchUp, chat.active.id)}
                 onSend={(text) => sendMessage(chat.active!.id, text)} />
             : <section className="rounded-2xl border border-slate-200 bg-white p-8">
                 <h2 className="text-xl font-semibold">Welcome{me ? `, ${me}` : ''}</h2>
