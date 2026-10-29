@@ -1,17 +1,23 @@
-from fastapi import Header, HTTPException
+from fastapi import Header
 
+from app.auth.errors import AuthError
+from app.auth.schemas import USERNAME
+from app.auth.security import decode_token
 from app.config import settings
 
 
 def verify_token(token: str) -> str | None:
-    """Return the username for a token, or None if invalid. F1 replaces the body with JWT checks."""
-    if settings.dev_auth and token:
+    """Shared synchronous token validation for REST and WebSocket handshakes."""
+    if settings.dev_auth and USERNAME.fullmatch(token):
         return token
-    return None  # TODO(F1): decode and verify the JWT
+    return decode_token(token)
 
 
 def get_current_user(authorization: str = Header(default="")) -> str:
-    username = verify_token(authorization.removeprefix("Bearer ").strip())
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not separator or not token or token != token.strip():
+        raise AuthError(401, "invalid_token", "Please sign in again.")
+    username = verify_token(token)
     if username is None:
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise AuthError(401, "invalid_token", "Please sign in again.")
     return username
