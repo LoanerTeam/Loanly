@@ -48,12 +48,16 @@ async def create_group(name: str, creator: str) -> dict:
     return serialize(document)
 
 
-async def join_group(group_id: str, username: str) -> tuple[dict, bool]:
-    """Add the user to a Group's Members; returns the Group and whether they were newly added."""
+def _object_id(group_id: str) -> ObjectId:
     try:
-        oid = ObjectId(group_id)
+        return ObjectId(group_id)
     except (InvalidId, TypeError) as error:
         raise ChatError("not_found", "no such Group") from error
+
+
+async def join_group(group_id: str, username: str) -> tuple[dict, bool]:
+    """Add the user to a Group's Members; returns the Group and whether they were newly added."""
+    oid = _object_id(group_id)
     async with asyncio.timeout(5):
         rooms = get_db().rooms
         # Filtering on non-membership makes the add atomic and tells a repeat join apart.
@@ -67,3 +71,39 @@ async def join_group(group_id: str, username: str) -> tuple[dict, bool]:
     if document is None:
         raise ChatError("not_found", "no such Group")
     return serialize(document), False
+
+
+async def leave_group(group_id: str, username: str) -> dict:
+    """Remove a Member other than the Creator; returns the updated Group."""
+    oid = _object_id(group_id)
+    async with asyncio.timeout(5):
+        rooms = get_db().rooms
+        # The filter enforces both rules atomically; a miss is explained by reading the Group.
+        document = await rooms.find_one_and_update(
+            {"_id": oid, "kind": "group", "members": username, "creator": {"$ne": username}},
+            {"$pull": {"members": username}}, return_document=ReturnDocument.AFTER,
+        )
+        if document is not None:
+            return serialize(document)
+        document = await rooms.find_one({"_id": oid, "kind": "group"})
+    if document is None:
+        raise ChatError("not_found", "no such Group")
+    if document["creator"] == username:
+        raise ChatError("creator_cannot_leave", "The Creator cannot leave their Group")
+    raise ChatError("not_member", "You are not a Member of this Group")
+
+
+async def delete_group(group_id: str, username: str) -> dict:
+    """Delete a Group with its messages and read markers; only its Creator may."""
+    oid = _object_id(group_id)
+    async with asyncio.timeout(5):
+        db = get_db()
+        document = await db.rooms.find_one_and_delete({"_id": oid, "kind": "group", "creator": username})
+        if document is None:
+            if await db.rooms.find_one({"_id": oid, "kind": "group"}, {"_id": 1}) is None:
+                raise ChatError("not_found", "no such Group")
+            raise ChatError("forbidden", "Only the Creator can delete this Group")
+        room_id = str(oid)
+        await db.messages.delete_many({"roomId": room_id})
+        await db.read_markers.delete_many({"roomId": room_id})
+    return serialize(document)

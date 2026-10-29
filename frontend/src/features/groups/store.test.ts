@@ -1,7 +1,11 @@
 import { beforeEach, expect, test, vi } from 'vitest'
 const client = vi.hoisted(() => ({ status: 'connected', send: vi.fn() }))
 vi.mock('../../ws/client', async (importOriginal) => ({ ...await importOriginal<typeof import('../../ws/client')>(), getConnectionStatus: () => client.status, send: client.send, on: vi.fn(), subscribeConnection: vi.fn() }))
-import { connectionChanged, createGroup, getGroups, receiveError, receiveGroup, receiveInit, resetGroups, setGroupDraft } from './store'
+import {
+  connectionChanged, createGroup, deleteGroup, getGroups, leaveGroup, receiveError, receiveGroup, receiveGroupRemoved,
+  receiveInit, resetGroups, setGroupDraft,
+} from './store'
+import { on } from '../../ws/client'
 const group = { id: 'one', kind: 'group', name: 'team', creator: 'alice', members: ['alice'] }
 beforeEach(() => { resetGroups(); client.status = 'connected'; client.send.mockReset().mockReturnValue(true) })
 function ready() { receiveInit({ type: 'init', me: 'alice', users: [], groups: [] }) }
@@ -80,4 +84,45 @@ test('malformed init cannot mark Group state ready', () => {
   receiveInit({ type: 'init', groups: [group] })
   expect(getGroups().ready).toBe(false)
   expect(getGroups().groups).toEqual([])
+})
+
+test('leave and delete send one request each and clear when confirmed', () => {
+  receiveInit({ type: 'init', me: 'alice', users: [], groups: [group] })
+  expect(leaveGroup('one')).toBe(true)
+  const leaveReq = getGroups().actionReq
+  expect(client.send).toHaveBeenCalledWith('group.leave', { groupId: 'one', reqId: leaveReq })
+  expect(getGroups().acting).toBe('one')
+  expect(deleteGroup('one')).toBe(false) // one action at a time
+  receiveGroupRemoved({ type: 'group.removed', groupId: 'one', reqId: 'other' })
+  expect(getGroups().groups).toEqual([])
+  expect(getGroups().actionReq).toBe(leaveReq)
+  receiveError({ type: 'error', reqId: leaveReq, code: 'creator_cannot_leave', detail: 'The Creator cannot leave' })
+  expect(getGroups()).toMatchObject({ acting: '', actionReq: null, actionError: 'The Creator cannot leave' })
+  expect(getGroups().error).toBe('')
+  expect(deleteGroup('one')).toBe(true)
+  const deleteReq = getGroups().actionReq
+  expect(client.send).toHaveBeenLastCalledWith('group.delete', { groupId: 'one', reqId: deleteReq })
+  receiveGroupRemoved({ type: 'group.removed', groupId: 'one', reqId: deleteReq })
+  expect(getGroups()).toMatchObject({ acting: '', actionReq: null, actionError: '' })
+})
+
+test('leave and delete are blocked while disconnected and cleared on connection loss', () => {
+  expect(leaveGroup('one')).toBe(false)
+  expect(getGroups().actionError).toContain('Connect')
+  ready(); client.send.mockReturnValue(false)
+  expect(deleteGroup('one')).toBe(false)
+  expect(getGroups().acting).toBe('')
+  client.send.mockReturnValue(true); leaveGroup('one')
+  client.status = 'reconnecting'; connectionChanged()
+  expect(getGroups()).toMatchObject({ acting: '', actionReq: null })
+})
+
+test('room.removed with the leave reqId confirms the leave', () => {
+  // The store registers its listeners through the mocked `on` when it is imported.
+  const removed = vi.mocked(on).mock.calls.find(([type]) => type === 'room.removed')![1]
+  ready(); leaveGroup('one')
+  removed({ type: 'room.removed', roomId: 'one', reqId: 'other' })
+  expect(getGroups().acting).toBe('one')
+  removed({ type: 'room.removed', roomId: 'one', reqId: getGroups().actionReq })
+  expect(getGroups()).toMatchObject({ acting: '', actionReq: null })
 })

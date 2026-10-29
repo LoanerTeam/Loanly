@@ -2,7 +2,8 @@ import { beforeEach, expect, test, vi } from 'vitest'
 const client = vi.hoisted(() => ({ status: 'connected', send: vi.fn() }))
 vi.mock('../../ws/client', async (importOriginal) => ({ ...await importOriginal<typeof import('../../ws/client')>(), getConnectionStatus: () => client.status, send: client.send, on: vi.fn(), subscribeConnection: vi.fn() }))
 import {
-  connectionChanged, getChat, openGroup, openPrivateChat, receiveError, receiveGroup, receiveHistory, receiveInit,
+  connectionChanged, getChat, openGroup, openPrivateChat, receiveError, receiveGroup, receiveGroupRemoved,
+  receiveHistory, receiveInit,
   receiveMessage, receiveRoom, receiveRoomRemoved, resetChat, selectRoom, sendMessage,
 } from './store'
 
@@ -131,5 +132,19 @@ test('group.upsert refreshes a joined room and ignores Groups I am not in', () =
   receiveGroup({ type: 'group.upsert', group: { ...team, members: ['bob', 'alice', 'carol'] } })
   expect(getChat().rooms[0].members).toEqual(['bob', 'alice', 'carol'])
   receiveGroup({ type: 'group.upsert', group: { ...team, id: 'g2' } })
+  expect(getChat().rooms).toHaveLength(1)
+})
+
+test('group.removed drops a deleted Group room, its messages and unread, and closes it if open', () => {
+  init([{ ...team, members: ['bob', 'alice'] }, room])
+  selectRoom('g1')
+  receiveHistory({ type: 'history', roomId: 'g1', messages: [msg('m1', 'hi', 'g1')] })
+  receiveMessage({ type: 'message.new', message: msg('m2', 'hey', 'r1') })
+  receiveGroupRemoved({ type: 'group.removed', groupId: 'g1' })
+  expect(getChat().rooms.map((r) => r.id)).toEqual(['r1'])
+  expect(getChat().messages.g1).toBeUndefined()
+  expect(getChat().activeId).toBe('')
+  expect(getChat().unread).toEqual({ r1: 1 })
+  receiveGroupRemoved({ type: 'group.removed', groupId: 5 })
   expect(getChat().rooms).toHaveLength(1)
 })

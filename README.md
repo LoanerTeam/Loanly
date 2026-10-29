@@ -100,3 +100,18 @@ the joining user gets the room. Leaving and deleting Groups are part of F6.
 
 `backend/tests/test_group_join.py` covers these rules over a real `/ws`
 connection with an in-memory database, so plain `pytest` runs it.
+
+## F6: leave and delete Groups
+
+With the F5 setup, Alice creates `team` and Bob joins it. Members other than the
+Creator see **Leave**; the Creator sees **Delete**; non-Members see neither.
+
+Bob clicks **Leave**: the room closes in all his tabs, everyone's Group list shows
+Members `alice`, and Bob no longer receives the Group's messages. He can **Join**
+again later and sees the full history. The Creator cannot leave: a `group.leave`
+from Alice's console returns `creator_cannot_leave`, and a `group.leave` from a
+non-Member returns `not_member`. Only Alice can delete `team`; a `group.delete`
+from Bob returns `forbidden`. After confirming, deletion removes the Group, its
+messages and its read markers, and the Group disappears for every user.
+
+`backend/tests/test_group_leave_delete.py` covers each rule with plain `pytest`.
