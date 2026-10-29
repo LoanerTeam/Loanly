@@ -4,12 +4,21 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 from google.genai import errors
+from mongomock_motor import AsyncMongoMockClient
+from pymongo.errors import ServerSelectionTimeoutError
 
 from app.ai import gemini
 from app.config import settings
 from app.main import app
 
 HEADERS = {"Authorization": "Bearer alice"}
+
+
+@pytest.fixture(autouse=True)
+def cache_db(monkeypatch):
+    database = AsyncMongoMockClient().loanly
+    monkeypatch.setattr("app.ai.translate.get_db", lambda: database)
+    return database
 
 
 @pytest.fixture
@@ -82,3 +91,47 @@ def test_empty_translation_is_failure(client, model):
     response = client.post("/api/ai/translate", headers=HEADERS,
                            json={"text": "hi", "targetLang": "th"})
     assert response.status_code == 502
+
+
+async def test_repeated_translation_uses_persisted_cache(client, model, cache_db):
+    body = {"text": "Hello", "targetLang": "th"}
+    first = client.post("/api/ai/translate", headers=HEADERS, json=body)
+    second = TestClient(app).post("/api/ai/translate", headers=HEADERS, json=body)
+    assert first.json() == second.json() == {"translation": "สวัสดี"}
+    assert model.await_count == 1
+    saved = await cache_db.translation_cache.find_one({})
+    assert saved["username"] == "alice"
+    assert saved["targetLang"] == "th"
+    assert "text" not in saved
+    assert await cache_db.translation_cache.count_documents({}) == 1
+
+
+def test_cache_is_separate_by_user_language_text_and_model(client, model, monkeypatch):
+    for username, text, language in [
+        ("alice", "Hello", "th"), ("bob", "Hello", "th"),
+        ("alice", "Hello", "en"), ("alice", "hello", "th"),
+    ]:
+        assert client.post("/api/ai/translate", headers={"Authorization": f"Bearer {username}"},
+                           json={"text": text, "targetLang": language}).status_code == 200
+    monkeypatch.setattr(settings, "gemini_model", "another-model")
+    assert client.post("/api/ai/translate", headers=HEADERS,
+                       json={"text": "Hello", "targetLang": "th"}).status_code == 200
+    assert model.await_count == 5
+
+
+async def test_provider_failure_is_not_cached(client, model, cache_db):
+    model.side_effect = TimeoutError()
+    assert client.post("/api/ai/translate", headers=HEADERS,
+                       json={"text": "Hello", "targetLang": "th"}).status_code == 502
+    assert await cache_db.translation_cache.count_documents({}) == 0
+
+
+def test_cache_outage_returns_friendly_error_without_provider_call(client, model, monkeypatch):
+    database = SimpleNamespace(translation_cache=SimpleNamespace(
+        find_one=AsyncMock(side_effect=ServerSelectionTimeoutError("offline"))))
+    monkeypatch.setattr("app.ai.translate.get_db", lambda: database)
+    response = client.post("/api/ai/translate", headers=HEADERS,
+                           json={"text": "Hello", "targetLang": "th"})
+    assert response.status_code == 503
+    assert response.json()["error"] == "cache_unavailable"
+    model.assert_not_called()
