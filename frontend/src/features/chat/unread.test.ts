@@ -3,7 +3,7 @@ const client = vi.hoisted(() => ({ status: 'connected', send: vi.fn() }))
 vi.mock('../../ws/client', async (importOriginal) => ({ ...await importOriginal<typeof import('../../ws/client')>(), getConnectionStatus: () => client.status, send: client.send, on: vi.fn(), subscribeConnection: vi.fn() }))
 import { renderToStaticMarkup } from 'react-dom/server'
 import { RoomList } from './RoomList'
-import { getChat, markActiveRead, receiveHistory, receiveInit, receiveMessage, resetChat, selectRoom } from './store'
+import { firstUnreadId, getChat, markActiveRead, receiveHistory, receiveInit, receiveMessage, resetChat, selectRoom } from './store'
 
 const room = { id: 'r1', kind: 'private' as const, name: 'bob', members: ['alice', 'bob'], creator: null }
 const other = { ...room, id: 'r2', name: 'carol', members: ['alice', 'carol'] }
@@ -66,4 +66,16 @@ test('the room list shows a badge only for rooms with unread messages', () => {
   const html = renderToStaticMarkup(RoomList({ rooms: [room, other], activeId: '', unread: { r1: 3 }, onSelect: () => {} }))
   expect(html).toContain('aria-label="3 unread"')
   expect(html.match(/unread/g)).toHaveLength(1)
+})
+
+test('first Unread Message is the oldest of the unread messages from others', () => {
+  const history = [msg('m1'), msg('m2', 'alice'), msg('m3'), msg('m4', 'alice'), msg('m5'), msg('m6')]
+  expect(firstUnreadId(history, 'alice', { roomId: 'r1', count: 2, lastId: 'm5' }, 'r1')).toBe('m3')
+  expect(firstUnreadId(history, 'alice', { roomId: 'r1', count: 1, lastId: 'm6' }, 'r1')).toBe('m6')
+  // More unread than loaded: the divider goes above the oldest message from others.
+  expect(firstUnreadId(history, 'alice', { roomId: 'r1', count: 9, lastId: 'm6' }, 'r1')).toBe('m1')
+  expect(firstUnreadId(history, 'alice', { roomId: 'r2', count: 2, lastId: 'm5' }, 'r1')).toBe('')
+  expect(firstUnreadId(history, 'alice', { roomId: 'r1', count: 0, lastId: 'm5' }, 'r1')).toBe('')
+  expect(firstUnreadId(history, 'alice', null, 'r1')).toBe('')
+  expect(firstUnreadId([], 'alice', { roomId: 'r1', count: 2, lastId: 'm5' }, 'r1')).toBe('')
 })
