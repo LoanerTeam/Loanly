@@ -12,7 +12,7 @@ export function onUnauthorized(listener: (token: string) => void): () => void {
 }
 
 export async function apiRequest<T>(path: string, options: {
-  method?: string; token?: string; body?: unknown
+  method?: string; token?: string; body?: unknown; signal?: AbortSignal; responseType?: 'blob'
 } = {}): Promise<T> {
   let response: Response
   try {
@@ -26,8 +26,10 @@ export async function apiRequest<T>(path: string, options: {
       ...(options.body !== undefined
         ? { body: options.body instanceof FormData ? options.body : JSON.stringify(options.body) } : {}),
       cache: 'no-store',
+      signal: options.signal,
     })
   } catch {
+    if (options.signal?.aborted) throw new DOMException('Request cancelled', 'AbortError')
     throw new ApiError(0, 'network_error', 'Could not reach Loanly. Check your connection and try again.')
   }
   if (!response.ok) {
@@ -39,7 +41,7 @@ export async function apiRequest<T>(path: string, options: {
     throw new ApiError(response.status, body?.error ?? 'request_failed',
       typeof body?.detail === 'string' ? body.detail : 'Something went wrong. Please try again.')
   }
-  return response.json()
+  return options.responseType === 'blob' ? response.blob() as Promise<T> : response.json()
 }
 
 export function authenticate(mode: AuthMode, username: string, password: string) {
