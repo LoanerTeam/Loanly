@@ -1,16 +1,21 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { MAX_TEXT } from './types'
 
-// `extra` is the attach point for the microphone button (speech-to-text).
-export function MessageInput({ onSend, extra }: { onSend: (text: string) => boolean; extra?: ReactNode }) {
+// `renderExtra` is the attach point for the microphone button (speech-to-text); `insert` puts
+// text in the box for the user to edit. It never sends anything by itself.
+export function MessageInput({ onSend, renderExtra }: {
+  onSend: (text: string) => boolean
+  renderExtra?: (insert: (text: string) => void) => ReactNode
+}) {
   const [text, setText] = useState('')
+  const insert = (added: string) => setText((current) => (current && !/\s$/.test(current) ? `${current} ${added}` : current + added).slice(0, MAX_TEXT))
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (onSend(text)) setText('')
   }
   return (
     <form className="flex items-center gap-2 border-t border-slate-200 p-3" onSubmit={submit}>
-      {extra}
+      {renderExtra?.(insert)}
       <input
         className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2"
         aria-label="Message"

@@ -19,10 +19,12 @@ export async function apiRequest<T>(path: string, options: {
     response = await fetch(`/api${path}`, {
       method: options.method ?? 'GET',
       headers: {
-        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        // FormData sets its own multipart boundary header.
+        ...(options.body !== undefined && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
         ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
       },
-      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(options.body !== undefined
+        ? { body: options.body instanceof FormData ? options.body : JSON.stringify(options.body) } : {}),
       cache: 'no-store',
     })
   } catch {

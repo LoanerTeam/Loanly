@@ -31,12 +31,17 @@ def _client(api_key: str) -> genai.Client:
 
 async def generate_text(prompt: str, *, instruction: str) -> str:
     """One Gemini text call shared by the AI features; failures become friendly AiErrors."""
+    return await generate(prompt, instruction=instruction)
+
+
+async def generate(contents, *, instruction: str, model: str = "", allow_empty: bool = False) -> str:
+    """Gemini call for text or audio `contents`. `allow_empty` returns "" instead of raising."""
     if not settings.gemini_api_key:
         raise AiError(503, "ai_unavailable", "AI features are not set up on this server.")
     try:
         async with asyncio.timeout(TIMEOUT):
             response = await _client(settings.gemini_api_key).aio.models.generate_content(
-                model=settings.gemini_model, contents=prompt,
+                model=model or settings.gemini_model, contents=contents,
                 config=types.GenerateContentConfig(system_instruction=instruction),
             )
     except errors.APIError as error:
@@ -48,6 +53,6 @@ async def generate_text(prompt: str, *, instruction: str) -> str:
     except (TimeoutError, httpx.HTTPError, OSError) as error:
         raise AiError(502, "ai_failed", "The AI service could not answer. Try again.") from error
     text = (response.text or "").strip()
-    if not text:
+    if not text and not allow_empty:
         raise AiError(502, "ai_failed", "The AI service could not answer. Try again.")
     return text
