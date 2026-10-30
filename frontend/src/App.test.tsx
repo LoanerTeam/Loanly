@@ -100,3 +100,44 @@ test('restores translation preference on reload and wires message translation th
     body: JSON.stringify({ text: 'Hello', targetLang: 'ja' }),
   }))
 })
+
+test('wires Speak beside Translate and stops audio when the room changes', async () => {
+  saveToken('signed-jwt')
+  const pause = vi.fn()
+  const revoke = vi.fn()
+  vi.stubGlobal('Audio', class {
+    pause = pause
+    play = vi.fn().mockResolvedValue(undefined)
+    removeAttribute = vi.fn()
+    load = vi.fn()
+  })
+  vi.stubGlobal('URL', { createObjectURL: () => 'blob:speech', revokeObjectURL: revoke })
+  const fetch = vi.fn(async (url: string) => url === '/api/ai/tts'
+    ? new Response('wav', { headers: { 'Content-Type': 'audio/wav' } })
+    : new Response(JSON.stringify({ username: 'alice', targetLang: 'en' })))
+  vi.stubGlobal('fetch', fetch)
+  render(<App />)
+  await screen.findByRole('combobox')
+  const ws = Socket.instances.at(-1)!
+  const room = { id: 'r1', kind: 'private', name: 'bob', members: ['alice', 'bob'], creator: null }
+  await act(async () => ws.onmessage?.({ data: JSON.stringify({
+    type: 'init', me: 'alice', users: [], rooms: [room, { ...room, id: 'r2', name: 'carol' }], groups: [], unread: {},
+  }) }))
+  await userEvent.click(screen.getByRole('button', { name: /bob/ }))
+  await act(async () => ws.onmessage?.({ data: JSON.stringify({
+    type: 'history', roomId: 'r1', messages: [
+      { id: 'm1', roomId: 'r1', sender: 'bob', text: 'Hello', ts: '2026-01-01T10:00:00Z' },
+    ],
+  }) }))
+  expect(await screen.findByRole('button', { name: 'Translate' })).toBeTruthy()
+  await userEvent.click(screen.getByRole('button', { name: 'Read message aloud' }))
+  await screen.findByRole('button', { name: 'Stop speech' })
+  expect(fetch).toHaveBeenCalledWith('/api/ai/tts', expect.objectContaining({
+    body: JSON.stringify({ text: 'Hello' }), headers: {
+      Authorization: 'Bearer signed-jwt', 'Content-Type': 'application/json',
+    },
+  }))
+  await userEvent.click(screen.getByRole('button', { name: /carol/ }))
+  expect(pause).toHaveBeenCalledOnce()
+  expect(revoke).toHaveBeenCalledWith('blob:speech')
+})

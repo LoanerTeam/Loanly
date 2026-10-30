@@ -17,6 +17,7 @@ import { AuthApp } from './features/auth/AuthApp'
 import { RoomAiBar } from './ai/RoomAiBar'
 import { MicButton } from './ai/MicButton'
 import { TranslateMessage, TranslationTools } from './features/translate/TranslationTools'
+import { SpeakButton, SpeechTools } from './features/tts/SpeechTools'
 
 // AuthApp supplies the verified JWT; chat features share this existing view.
 export function PresenceApp({ token, onDisconnect, targetLang = 'en' }: {
@@ -57,13 +58,13 @@ export function PresenceApp({ token, onDisconnect, targetLang = 'en' }: {
             </div>
           </aside>
           {chat.active
-            ? <ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
-                messageActions={(message) => <TranslateMessage text={message.text} />}
+            ? <SpeechTools key={`${token}:${chat.active.id}`}><ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
+                messageActions={(message) => <><TranslateMessage text={message.text} /><SpeakButton token={token} text={message.text} /></>}
                 inputExtra={(insert) => <MicButton token={token} onText={insert} />}
                 toolbar={<RoomAiBar key={`${chat.active.id}:${chat.catchUp?.lastId ?? ''}`} room={chat.active}
                   messages={chat.activeMessages} me={me} catchUp={chat.catchUp} token={token} />}
                 firstUnreadId={firstUnreadId(chat.activeMessages, me, chat.catchUp, chat.active.id)}
-                onSend={(text) => sendMessage(chat.active!.id, text)} />
+                onSend={(text) => sendMessage(chat.active!.id, text)} /></SpeechTools>
             : <section className="rounded-2xl border border-slate-200 bg-white p-8">
                 <h2 className="text-xl font-semibold">Welcome{me ? `, ${me}` : ''}</h2>
                 <p className="mt-2 text-slate-500">Pick a user to start a private chat.</p>
