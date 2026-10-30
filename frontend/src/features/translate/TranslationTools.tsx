@@ -1,5 +1,6 @@
 import { createContext, useContext, useRef, useState, type ReactNode } from 'react'
 import { apiRequest, type Profile } from '../auth/api'
+import { SpeakButton } from '../tts/SpeechTools'
 
 const languages = {
   en: 'English', th: 'ไทย', ja: '日本語', zh: '中文',
@@ -72,9 +73,12 @@ function Translation({ token, targetLang, text }: { token: string; targetLang: s
     }
   }
   return <div className="max-w-full text-sm">
-    <button className="underline disabled:opacity-50" disabled={busy} onClick={() => void translate()}>
-      {busy ? 'Translating…' : error ? 'Retry translation' : 'Translate'}
-    </button>
+    <div className="flex items-center gap-1">
+      <button className="underline disabled:opacity-50" disabled={busy} onClick={() => void translate()}>
+        {busy ? 'Translating…' : error ? 'Retry translation' : 'Translate'}
+      </button>
+      {translation && !busy && <SpeakButton key={translation} token={token} text={translation} label="Read translated message aloud" />}
+    </div>
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {translation && <p role="status" lang={targetLang} className="mt-1 whitespace-pre-wrap break-words text-slate-700">{translation}</p>}
   </div>
