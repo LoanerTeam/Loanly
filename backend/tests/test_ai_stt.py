@@ -48,7 +48,7 @@ def test_transcribes_supported_recordings_with_the_transcribe_model(client, mode
     part = call["contents"][0]
     assert part.inline_data.data == data
     assert part.inline_data.mime_type == mime.split(";")[0]
-    assert "not instructions" in call["config"].system_instruction
+    assert call["config"] is None  # the transcribe model rejects a system instruction
 
 
 def test_requires_login_and_never_calls_the_provider_without_it(client, model):
@@ -81,11 +81,12 @@ def test_missing_audio_field_is_a_validation_error(client, model):
     model.assert_not_called()
 
 
-def test_falls_back_to_the_regular_model_when_transcribe_returns_nothing(client, model):
-    model.side_effect = [SimpleNamespace(text=""), SimpleNamespace(text="from fallback")]
-    response = upload(client, WEBM)
-    assert response.json() == {"text": "from fallback"}
-    assert [c.kwargs["model"] for c in model.call_args_list] == [settings.gemini_stt_model, settings.gemini_model]
+def test_empty_transcript_is_no_speech_and_never_asks_a_chat_model(client, model):
+    """A chat model given silence would reply with text, which must not reach the chat box."""
+    model.return_value = SimpleNamespace(text="")
+    assert upload(client, WEBM).json()["error"] == "no_speech"
+    model.assert_called_once()
+    assert model.call_args.kwargs["model"] == settings.gemini_stt_model
 
 
 def test_silence_is_reported_as_no_speech(client, model):
@@ -113,3 +114,24 @@ def test_provider_failures_become_friendly_errors(client, model, error, status, 
 def test_unconfigured_server_says_ai_is_unavailable(client, model, monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", "")
     assert upload(client, WEBM).json()["error"] == "ai_unavailable"
+
+
+def test_reads_the_transcript_from_audio_transcription_parts(client, model):
+    """The real transcribe model returns speech in `audio_transcription`, and `.text` is None."""
+    parts = [SimpleNamespace(audio_transcription=SimpleNamespace(text=" Hello, this is a test. "))]
+    model.return_value = SimpleNamespace(
+        text=None, candidates=[SimpleNamespace(content=SimpleNamespace(parts=parts))])
+    assert upload(client, WEBM).json() == {"text": "Hello, this is a test."}
+    model.assert_called_once()  # no fallback needed
+
+
+def test_response_without_any_text_or_parts_is_no_speech(client, model):
+    model.return_value = SimpleNamespace(text=None, candidates=[SimpleNamespace(content=SimpleNamespace(parts=None))])
+    assert upload(client, WEBM).json()["error"] == "no_speech"
+
+
+def test_candidate_without_content_is_no_speech_not_a_crash(client, model):
+    """Real Gemini behaviour for silent audio: a candidate whose `content` is None."""
+    model.return_value = SimpleNamespace(text=None, candidates=[SimpleNamespace(content=None)])
+    response = upload(client, WEBM)
+    assert (response.status_code, response.json()["error"]) == (422, "no_speech")

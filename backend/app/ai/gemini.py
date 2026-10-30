@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from functools import cache
 
 import httpx
@@ -10,6 +11,7 @@ from google.genai import errors, types
 from app.config import settings
 
 TIMEOUT = 30
+log = logging.getLogger(__name__)
 
 
 class AiError(Exception):
@@ -34,17 +36,20 @@ async def generate_text(prompt: str, *, instruction: str) -> str:
     return await generate(prompt, instruction=instruction)
 
 
-async def generate(contents, *, instruction: str, model: str = "", allow_empty: bool = False) -> str:
-    """Gemini call for text or audio `contents`. `allow_empty` returns "" instead of raising."""
+async def generate(contents, *, instruction: str = "", model: str = "", allow_empty: bool = False) -> str:
+    """Gemini call for text or audio `contents`. `allow_empty` returns "" instead of raising.
+
+    An empty `instruction` sends no system instruction: the transcribe model rejects one."""
     if not settings.gemini_api_key:
         raise AiError(503, "ai_unavailable", "AI features are not set up on this server.")
     try:
         async with asyncio.timeout(TIMEOUT):
             response = await _client(settings.gemini_api_key).aio.models.generate_content(
                 model=model or settings.gemini_model, contents=contents,
-                config=types.GenerateContentConfig(system_instruction=instruction),
+                config=types.GenerateContentConfig(system_instruction=instruction) if instruction else None,
             )
     except errors.APIError as error:
+        log.warning("Gemini call failed (%s): %s", error.code, error)
         if error.code == 429:
             raise AiError(429, "ai_quota", "The AI quota is used up for now. Try again later.") from error
         if error.code == 503:
@@ -52,7 +57,20 @@ async def generate(contents, *, instruction: str, model: str = "", allow_empty: 
         raise AiError(502, "ai_failed", "The AI service could not answer. Try again.") from error
     except (TimeoutError, httpx.HTTPError, OSError) as error:
         raise AiError(502, "ai_failed", "The AI service could not answer. Try again.") from error
-    text = (response.text or "").strip()
+    text = _transcript(response)
     if not text and not allow_empty:
         raise AiError(502, "ai_failed", "The AI service could not answer. Try again.")
     return text
+
+
+def _transcript(response) -> str:
+    """Reply text; the transcribe model returns speech in `audio_transcription` parts, not `.text`."""
+    text = (response.text or "").strip()
+    if text:
+        return text
+    candidate = (getattr(response, "candidates", None) or [None])[0]
+    parts = getattr(getattr(candidate, "content", None), "parts", None) or []  # silence has no content
+    return " ".join(
+        p.audio_transcription.text.strip() for p in parts
+        if getattr(p, "audio_transcription", None) and p.audio_transcription.text
+    ).strip()
