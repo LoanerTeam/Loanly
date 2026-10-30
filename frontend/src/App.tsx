@@ -41,7 +41,7 @@ export function PresenceApp({ token, onDisconnect, targetLang = 'en' }: {
           <button className="rounded-lg border border-slate-300 px-4 py-2" onClick={onDisconnect}>Log out</button>
         </header>
         <TranslationTools key={token} token={token} initialLanguage={targetLang}>
-        <div className="grid gap-6 md:grid-cols-[280px_1fr]">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="rounded-2xl border border-slate-200 bg-white p-4">
             <h2 className="mb-3 font-semibold">Users <span className="text-sm font-normal text-slate-500">{users.filter((u) => u.online).length} online</span></h2>
             <UserList users={users} me={me} onSelect={openPrivateChat} />
@@ -59,7 +59,8 @@ export function PresenceApp({ token, onDisconnect, targetLang = 'en' }: {
           </aside>
           {chat.active
             ? <SpeechTools key={`${token}:${chat.active.id}`}><ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
-                messageActions={(message) => <><TranslateMessage text={message.text} /><SpeakButton token={token} text={message.text} /></>}
+                messageLeading={(message) => <SpeakButton token={token} text={message.text} />}
+                messageActions={(message) => <TranslateMessage text={message.text} />}
                 inputExtra={(insert) => <MicButton token={token} onText={insert} />}
                 toolbar={<RoomAiBar key={`${chat.active.id}:${chat.catchUp?.lastId ?? ''}`} room={chat.active}
                   messages={chat.activeMessages} me={me} catchUp={chat.catchUp} token={token} />}
