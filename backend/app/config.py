@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_stt_model: str = "gemini-3.5-transcribe"
+    gemini_tts_model: str = "gemini-3.8-flash-tts"
     dev_auth: bool = False
 
 
