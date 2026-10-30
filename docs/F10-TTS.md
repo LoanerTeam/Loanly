@@ -1,7 +1,8 @@
 # F10 Text-to-speech
 
-Issue #12. A speaker button reads the original text of one Message to the user
-who presses it. It works beside Translate in Private Rooms and Groups.
+Issues #12 and #36. An icon-only speaker before the Message bubble reads its
+original text. After translation, a second speaker immediately after Translate
+reads the displayed translation. Both work in Private Rooms and Groups.
 
 ## Backend
 
@@ -34,7 +35,9 @@ retrying. Choosing another Message aborts the previous request and stops
 its audio. Late results are ignored. Switching rooms or logging out unmounts
 the tools, aborts requests and releases the audio and Object URLs. Browser
 playback failures show a local error and allow retry. There is no autoplay
-when Messages arrive.
+when Messages arrive. Original and translated speech share the same audio
+owner, so starting either stops the other. Changing translation language or
+replacing a translation removes its old audio control and stops its playback.
 
 The shared REST helper's optional Blob response and AbortSignal preserve
 its existing JSON defaults and 401 logout handling. Shared wiring registers

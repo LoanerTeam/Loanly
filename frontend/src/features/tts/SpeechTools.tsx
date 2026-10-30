@@ -13,7 +13,9 @@ export function SpeechTools({ children }: { children: ReactNode }) {
   </SpeechContext>
 }
 
-export function SpeakButton({ token, text }: { token: string; text: string }) {
+export function SpeakButton({ token, text, label = 'Read message aloud' }: {
+  token: string; text: string; label?: string
+}) {
   const { claim } = useContext(SpeechContext)
   const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle')
   const [error, setError] = useState('')
@@ -58,17 +60,22 @@ export function SpeakButton({ token, text }: { token: string; text: string }) {
       if (current.current !== operation) return
       stop(); setState('idle')
       setError(failure instanceof DOMException && failure.name === 'NotAllowedError'
-        ? 'Audio playback was blocked. Press Retry speech to try again.'
+        ? 'Audio playback was blocked. Press the speaker to try again.'
         : failure instanceof Error ? failure.message : 'Could not play speech. Please try again.')
     }
   }
 
-  return <div className="text-sm">
-    <button className="underline" aria-label={state === 'loading' ? 'Cancel speech' : state === 'playing' ? 'Stop speech' : error ? 'Retry speech' : 'Read message aloud'}
-      aria-pressed={state !== 'idle'} onClick={() => void speak()}>
-      <span aria-hidden="true">{state === 'idle' ? '🔊' : '■'}</span>{' '}
-      {state === 'loading' ? 'Creating speech…' : state === 'playing' ? 'Stop' : error ? 'Retry speech' : 'Speak'}
+  const action = state === 'loading' ? 'Cancel speech' : state === 'playing' ? 'Stop speech' : error ? 'Retry speech' : label
+  return <div className="relative inline-flex shrink-0 text-sm">
+    <button type="button" className={`inline-flex size-8 items-center justify-center rounded-full hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${state !== 'idle' ? 'text-blue-600' : 'text-slate-500'}`}
+      aria-label={action} title={action} aria-pressed={state !== 'idle'} onClick={() => void speak()}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+        className={`size-4 ${state === 'loading' ? 'animate-pulse motion-reduce:animate-none' : ''}`}>
+        <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+        <path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" />
+      </svg>
     </button>
-    {error && <p role="alert" className="text-red-600">{error}</p>}
+    {state === 'loading' && <span role="status" className="sr-only">Creating speech…</span>}
+    {error && <p role="alert" className="absolute left-0 top-full z-10 w-56 rounded-lg border border-red-200 bg-white p-2 text-red-600 shadow-sm">{error}</p>}
   </div>
 }
