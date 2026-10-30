@@ -18,6 +18,18 @@ test('unread divider and per-message actions render together', () => {
   expect(html.indexOf('aria-label="Unread messages"')).toBeLessThan(html.indexOf('Translate hello'))
 })
 
+test('speaker slot precedes both own and incoming message bubbles', () => {
+  const html = renderToStaticMarkup(
+    <ChatRoom room={room} me="alice" onSend={() => true}
+      messages={[message('alice', 'own text'), message('bob', 'incoming text')]}
+      messageLeading={(entry) => <button aria-label={`Read ${entry.sender}`} />}
+      messageActions={() => <button>Translate</button>} />,
+  )
+  for (const [sender, text] of [['alice', 'own text'], ['bob', 'incoming text']]) {
+    expect(html.indexOf(`aria-label="Read ${sender}"`)).toBeLessThan(html.indexOf(`>${text}</p>`))
+  }
+})
+
 test('chat room has a message window and a chat box, and shows incoming and own messages', () => {
   const html = renderToStaticMarkup(
     <ChatRoom room={room} me="alice" onSend={() => true} messages={[message('bob', 'hello'), message('alice', 'hi bob')]} />,

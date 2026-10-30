@@ -101,7 +101,7 @@ test('restores translation preference on reload and wires message translation th
   }))
 })
 
-test('wires Speak beside Translate and stops audio when the room changes', async () => {
+test('wires icon-only speech before the original bubble and after Translate, with room cleanup', async () => {
   saveToken('signed-jwt')
   const pause = vi.fn()
   const revoke = vi.fn()
@@ -112,9 +112,11 @@ test('wires Speak beside Translate and stops audio when the room changes', async
     load = vi.fn()
   })
   vi.stubGlobal('URL', { createObjectURL: () => 'blob:speech', revokeObjectURL: revoke })
-  const fetch = vi.fn(async (url: string) => url === '/api/ai/tts'
-    ? new Response('wav', { headers: { 'Content-Type': 'audio/wav' } })
-    : new Response(JSON.stringify({ username: 'alice', targetLang: 'en' })))
+  const fetch = vi.fn(async (url: string) => {
+    if (url === '/api/ai/tts') return new Response('wav', { headers: { 'Content-Type': 'audio/wav' } })
+    if (url === '/api/ai/translate') return new Response(JSON.stringify({ translation: 'สวัสดี' }))
+    return new Response(JSON.stringify({ username: 'alice', targetLang: 'th' }))
+  })
   vi.stubGlobal('fetch', fetch)
   render(<App />)
   await screen.findByRole('combobox')
@@ -130,14 +132,24 @@ test('wires Speak beside Translate and stops audio when the room changes', async
     ],
   }) }))
   expect(await screen.findByRole('button', { name: 'Translate' })).toBeTruthy()
-  await userEvent.click(screen.getByRole('button', { name: 'Read message aloud' }))
+  const originalSpeaker = screen.getByRole('button', { name: 'Read message aloud' })
+  expect(originalSpeaker.textContent).toBe('')
+  expect(originalSpeaker.parentElement?.nextElementSibling?.textContent).toContain('Hello')
+  await userEvent.click(originalSpeaker)
   await screen.findByRole('button', { name: 'Stop speech' })
   expect(fetch).toHaveBeenCalledWith('/api/ai/tts', expect.objectContaining({
     body: JSON.stringify({ text: 'Hello' }), headers: {
       Authorization: 'Bearer signed-jwt', 'Content-Type': 'application/json',
     },
   }))
-  await userEvent.click(screen.getByRole('button', { name: /carol/ }))
+  await userEvent.click(screen.getByRole('button', { name: 'Translate' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Read translated message aloud' }))
+  await screen.findByRole('button', { name: 'Stop speech' })
+  expect(fetch).toHaveBeenCalledWith('/api/ai/tts', expect.objectContaining({
+    body: JSON.stringify({ text: 'สวัสดี' }),
+  }))
   expect(pause).toHaveBeenCalledOnce()
+  await userEvent.click(screen.getByRole('button', { name: /carol/ }))
+  expect(pause).toHaveBeenCalledTimes(2)
   expect(revoke).toHaveBeenCalledWith('blob:speech')
 })
