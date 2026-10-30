@@ -3,13 +3,14 @@ import { MessageInput } from './MessageInput'
 import { MessageItem } from './MessageItem'
 import type { Message, Room } from './types'
 
-export function ChatRoom({ room, messages, me, error, toolbar, messageActions, firstUnreadId = '', onSend }: {
+export function ChatRoom({ room, messages, me, error, toolbar, messageActions, inputExtra, firstUnreadId = '', onSend }: {
   room: Room
   messages: Message[]
   me: string
   error?: string
   toolbar?: ReactNode // attach point for room-level AI tools (summarize unread)
   messageActions?: (message: Message) => ReactNode
+  inputExtra?: (insert: (text: string) => void) => ReactNode // attach point for the microphone
   firstUnreadId?: string // the divider goes above this message
   onSend: (text: string) => boolean
 }) {
@@ -49,7 +50,7 @@ export function ChatRoom({ room, messages, me, error, toolbar, messageActions, f
         <li ref={end} aria-hidden="true" />
       </ul>
       {error && <p role="alert" className="px-4 pb-1 text-sm text-red-600">{error}</p>}
-      <MessageInput onSend={onSend} />
+      <MessageInput onSend={onSend} renderExtra={inputExtra} />
     </section>
   )
 }

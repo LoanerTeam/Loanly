@@ -15,6 +15,7 @@ import { ChatRoom } from './features/chat/ChatRoom'
 import { RoomList } from './features/chat/RoomList'
 import { AuthApp } from './features/auth/AuthApp'
 import { RoomAiBar } from './ai/RoomAiBar'
+import { MicButton } from './ai/MicButton'
 import { TranslateMessage, TranslationTools } from './features/translate/TranslationTools'
 
 // AuthApp supplies the verified JWT; chat features share this existing view.
@@ -58,6 +59,7 @@ export function PresenceApp({ token, onDisconnect, targetLang = 'en' }: {
           {chat.active
             ? <ChatRoom room={chat.active} messages={chat.activeMessages} me={me} error={chat.error}
                 messageActions={(message) => <TranslateMessage text={message.text} />}
+                inputExtra={(insert) => <MicButton token={token} onText={insert} />}
                 toolbar={<RoomAiBar key={`${chat.active.id}:${chat.catchUp?.lastId ?? ''}`} room={chat.active}
                   messages={chat.activeMessages} me={me} catchUp={chat.catchUp} token={token} />}
                 firstUnreadId={firstUnreadId(chat.activeMessages, me, chat.catchUp, chat.active.id)}

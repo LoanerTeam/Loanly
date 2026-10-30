@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_stt_model: str = "gemini-3.5-transcribe"
     dev_auth: bool = False
 
 
