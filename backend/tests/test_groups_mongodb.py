@@ -6,10 +6,11 @@ from uuid import uuid4
 import pytest
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from app.chat import groups
+from app.chat import groups, repo
 from app.chat.hub import ChatError
 
 REAL_ENSURE_INDEXES = groups.ensure_indexes
+REAL_REPO_ENSURE_INDEXES = repo.ensure_indexes
 
 
 @pytest.mark.skipif(not os.environ.get('LOANLY_TEST_MONGODB_URI'),
@@ -54,4 +55,22 @@ async def test_unique_group_names_and_persistence_across_clients(monkeypatch):
         await client.drop_database(name)
         if fresh is not None:
             fresh.close()
+        client.close()
+
+
+@pytest.mark.skipif(not os.environ.get('LOANLY_TEST_MONGODB_URI'),
+                    reason='Set LOANLY_TEST_MONGODB_URI to run real MongoDB integration tests')
+async def test_simultaneous_dm_open_creates_one_private_room(monkeypatch):
+    client = AsyncIOMotorClient(os.environ['LOANLY_TEST_MONGODB_URI'], serverSelectionTimeoutMS=3000)
+    name = f'loanly_test_{uuid4().hex}'
+    try:
+        db = client[name]
+        monkeypatch.setattr(repo, 'get_db', lambda: db)
+        await REAL_REPO_ENSURE_INDEXES()
+        rooms = await asyncio.gather(*(repo.get_or_create_private_room(*pair)
+                                       for pair in [('alice', 'bob'), ('bob', 'alice')] * 5))
+        assert len({room['_id'] for room in rooms}) == 1
+        assert await db.rooms.count_documents({'kind': 'private'}) == 1
+    finally:
+        await client.drop_database(name)
         client.close()

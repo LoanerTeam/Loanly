@@ -1,6 +1,6 @@
 from app.chat import repo
 from app.chat.hub import ChatError, Connection, connections, send_to
-from app.chat.presence import registered_usernames
+from app.chat.presence import user_exists
 from app.chat.registry import handler
 
 
@@ -11,7 +11,7 @@ async def dm_open(conn: Connection, msg: dict) -> None:
         raise ChatError("unknown_user")
     if other == conn.username:
         raise ChatError("forbidden", "cannot message yourself")
-    if other not in await registered_usernames() and other not in connections:
+    if other not in connections and not await user_exists(other):
         raise ChatError("unknown_user")
     room = await repo.get_or_create_private_room(conn.username, other)
     await conn.send("room.upsert", room=repo.room_dto(room, conn.username), reqId=msg.get("reqId"))

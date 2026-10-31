@@ -25,11 +25,11 @@ def client(monkeypatch):
 def fake_gemini(monkeypatch):
     calls = []
 
-    async def generate_text(prompt, *, instruction):
+    async def generate(prompt, *, instruction):
         calls.append((prompt, instruction))
         return "Bob and Carol agreed on lunch at the canteen at noon."
 
-    monkeypatch.setattr(gemini, "generate_text", generate_text)
+    monkeypatch.setattr(gemini, "generate", generate)
     return calls
 
 
@@ -83,7 +83,7 @@ def test_ai_errors_use_the_rest_error_shape(client, monkeypatch):
     async def quota(prompt, *, instruction):
         raise gemini.AiError(429, "ai_quota", "The AI quota is used up for now. Try again later.")
 
-    monkeypatch.setattr(gemini, "generate_text", quota)
+    monkeypatch.setattr(gemini, "generate", quota)
     response = client.post("/api/ai/summarize", json=BODY, headers=ALICE)
     assert response.status_code == 429
     assert response.json() == {"error": "ai_quota", "detail": "The AI quota is used up for now. Try again later."}
@@ -109,8 +109,8 @@ def models(monkeypatch):
     return fake
 
 
-async def test_generate_text_uses_the_configured_model_and_instruction(models):
-    assert await gemini.generate_text("prompt", instruction="be brief") == "a summary"
+async def test_generate_uses_the_configured_model_and_instruction(models):
+    assert await gemini.generate("prompt", instruction="be brief") == "a summary"
     [call] = models.calls
     assert call["model"] == "test-model"
     assert call["contents"] == "prompt"
@@ -120,7 +120,7 @@ async def test_generate_text_uses_the_configured_model_and_instruction(models):
 async def test_missing_key_is_reported_without_a_call(models, monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", "")
     with pytest.raises(gemini.AiError) as error:
-        await gemini.generate_text("prompt", instruction="x")
+        await gemini.generate("prompt", instruction="x")
     assert (error.value.status, error.value.code) == (503, "ai_unavailable")
     assert models.calls == []
 
@@ -136,7 +136,7 @@ async def test_missing_key_is_reported_without_a_call(models, monkeypatch):
 async def test_gemini_failures_become_friendly_errors(models, failure, status, code):
     models.error = failure
     with pytest.raises(gemini.AiError) as error:
-        await gemini.generate_text("prompt", instruction="x")
+        await gemini.generate("prompt", instruction="x")
     assert (error.value.status, error.value.code) == (status, code)
     assert "test-key" not in error.value.detail
 
@@ -145,7 +145,7 @@ async def test_gemini_failures_become_friendly_errors(models, failure, status, c
 async def test_empty_answer_is_a_failure(models, text):
     models.result = SimpleNamespace(text=text)
     with pytest.raises(gemini.AiError) as error:
-        await gemini.generate_text("prompt", instruction="x")
+        await gemini.generate("prompt", instruction="x")
     assert error.value.code == "ai_failed"
 
 

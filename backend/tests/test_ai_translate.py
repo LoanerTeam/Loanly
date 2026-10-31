@@ -100,13 +100,13 @@ async def test_repeated_translation_uses_persisted_cache(client, model, cache_db
     assert first.json() == second.json() == {"translation": "สวัสดี"}
     assert model.await_count == 1
     saved = await cache_db.translation_cache.find_one({})
-    assert saved["username"] == "alice"
+    assert "username" not in saved
     assert saved["targetLang"] == "th"
     assert "text" not in saved
     assert await cache_db.translation_cache.count_documents({}) == 1
 
 
-def test_cache_is_separate_by_user_language_text_and_model(client, model, monkeypatch):
+def test_cache_is_shared_by_users_and_separate_by_language_text_and_model(client, model, monkeypatch):
     for username, text, language in [
         ("alice", "Hello", "th"), ("bob", "Hello", "th"),
         ("alice", "Hello", "en"), ("alice", "hello", "th"),
@@ -116,7 +116,7 @@ def test_cache_is_separate_by_user_language_text_and_model(client, model, monkey
     monkeypatch.setattr(settings, "gemini_model", "another-model")
     assert client.post("/api/ai/translate", headers=HEADERS,
                        json={"text": "Hello", "targetLang": "th"}).status_code == 200
-    assert model.await_count == 5
+    assert model.await_count == 4
 
 
 async def test_provider_failure_is_not_cached(client, model, cache_db):

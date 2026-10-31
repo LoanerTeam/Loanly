@@ -14,6 +14,12 @@ async def registered_usernames() -> set[str]:
     return {user["username"] async for user in cursor}
 
 
+async def user_exists(username: str) -> bool:
+    if settings.dev_auth:
+        return username in dev_users
+    return await get_db().users.find_one({"username": username}, {"_id": 1}) is not None
+
+
 async def initialize(conn: Connection) -> None:
     async with presence_lock:
         async with asyncio.timeout(5):

@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile
+from fastapi.responses import JSONResponse
 from google.genai import types
 from pydantic import BaseModel
 
-from app.ai import gemini
+from app.ai import gemini, limits
 from app.config import settings
 from app.deps import get_current_user
 
 router = APIRouter()
 MAX_BYTES = 10 * 1024 * 1024  # ~10 MB: minutes of speech, well under the model limit
+FORM_OVERHEAD = 64 * 1024  # multipart boundaries and part headers
 MAX_TEXT = 2000  # chat message limit, so the transcript always fits the chat box
 # MIME type -> (offset, signature) of the container header. The browser-supplied type is
 # untrusted, so the bytes must also look like the claimed container.
@@ -39,10 +41,24 @@ def check_audio(mime: str, data: bytes) -> str:
     return base
 
 
+async def reject_large_upload(request: Request, call_next):
+    """FastAPI saves the whole form before the handler runs, so check the size first.
+    Browsers always send Content-Length for a FormData upload."""
+    if request.url.path == "/api/ai/stt":
+        size = request.headers.get("content-length", "")
+        if not size.isdigit() or int(size) > MAX_BYTES + FORM_OVERHEAD:
+            return JSONResponse(status_code=413, content={
+                "error": "audio_too_large",
+                "detail": "The recording is too long. Keep it under a few minutes.",
+            })
+    return await call_next(request)
+
+
 @router.post("/stt", response_model=SttResponse)
 async def speech_to_text(audio: UploadFile, username: str = Depends(get_current_user)) -> dict:
     data = await audio.read(MAX_BYTES + 1)  # never buffer more than the limit plus one byte
     mime = check_audio(audio.content_type or "", data)
+    limits.take("stt", username)
     part = types.Part.from_bytes(data=data, mime_type=mime)
     # The transcribe model takes no system instruction and only transcribes. There is no
     # fallback to a chat model: given silence it would answer instead of transcribing.

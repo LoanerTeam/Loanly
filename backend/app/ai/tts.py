@@ -8,6 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field, field_validator
 
+from app.ai import limits
 from app.ai.gemini import TIMEOUT, AiError
 from app.config import settings
 from app.deps import get_current_user
@@ -82,5 +83,6 @@ async def generate_speech(text: str) -> bytes:
 
 @router.post("/tts")
 async def text_to_speech(body: TtsRequest, username: str = Depends(get_current_user)) -> Response:
+    limits.take("tts", username)
     return Response(await generate_speech(body.text), media_type="audio/wav",
                     headers={"Cache-Control": "no-store"})

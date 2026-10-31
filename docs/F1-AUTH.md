@@ -46,6 +46,10 @@ not continuously on an already-open connection. There is no refresh or token
 revocation endpoint. Logout clears this Client's credentials and connection;
 an issued JWT remains valid until expiration.
 
+After 10 failed logins for one Username within 15 minutes, login answers 429
+`too_many_attempts` without checking the password. The count is in memory, so a
+restart clears it. The WebSocket token is masked as `token=***` in Uvicorn logs.
+
 `DEV_AUTH=1` still accepts a valid Username as a development token, as well as a
 real JWT. It must stay off for real-auth integration and deployment; the existing
 Render guard remains in force.

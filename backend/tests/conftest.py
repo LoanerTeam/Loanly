@@ -3,7 +3,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.chat import groups, hub, presence
+from app.ai import limits, translate
+from app.auth import router
+from app.chat import groups, hub, presence, repo
 from app.chat.hub import connections, dev_users
 
 
@@ -13,6 +15,10 @@ def clear_presence(monkeypatch):
     monkeypatch.setattr(hub, "presence_lock", lock)
     monkeypatch.setattr(presence, "presence_lock", lock)
     monkeypatch.setattr(groups, "ensure_indexes", AsyncMock())
+    monkeypatch.setattr(repo, "ensure_indexes", AsyncMock())
+    monkeypatch.setattr(translate, "ensure_indexes", AsyncMock())
+    limits.reset()
+    router.failures.clear()
     # Ordinary chat unit tests do not need an account database or JWT configuration.
     # Application-auth integration tests restore the real initializer explicitly.
     monkeypatch.setattr("app.main.initialize_auth", AsyncMock())
