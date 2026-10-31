@@ -1,3 +1,5 @@
+import asyncio
+
 from app.chat import repo
 from app.chat.hub import ChatError, Connection, send_to
 from app.chat.registry import handler
@@ -21,8 +23,8 @@ async def message_send(conn: Connection, msg: dict) -> None:
         raise ChatError("invalid_text", f"text must be 1-{MAX_TEXT} characters")
     room = await member_room(conn, msg.get("roomId"))
     saved = repo.message_dto(await repo.add_message(str(room["_id"]), conn.username, text))
-    for member in room["members"]:
-        await send_to(member, "message.new", message=saved)
+    # In parallel, so one stalled tab does not delay the other Members.
+    await asyncio.gather(*(send_to(m, "message.new", message=saved) for m in room["members"]))
 
 
 @handler("history.get")

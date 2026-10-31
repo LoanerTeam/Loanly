@@ -11,6 +11,13 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_stt_model: str = "gemini-3.5-transcribe"
     gemini_tts_model: str = "gemini-3.8-flash-tts"
+    # Requests per minute / per day for each Gemini model; match your AI Studio free-tier limits.
+    ai_text_rpm: int = 10
+    ai_text_rpd: int = 500
+    ai_stt_rpm: int = 3
+    ai_stt_rpd: int = 100
+    ai_tts_rpm: int = 3
+    ai_tts_rpd: int = 15
     dev_auth: bool = False
 
 

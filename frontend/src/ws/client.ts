@@ -18,6 +18,10 @@ export function on(type: string, fn: Listener): () => void {
 export function dispatch(raw: string): void {
   let frame: unknown
   try { frame = JSON.parse(raw) } catch { return }
+  dispatchFrame(frame)
+}
+
+function dispatchFrame(frame: unknown): void {
   if (!frame || typeof frame !== 'object' || !('type' in frame) || typeof frame.type !== 'string') return
   listeners.get(frame.type)?.forEach((fn) => fn(frame as Frame))
 }
@@ -78,7 +82,7 @@ export function connect(token: string): void {
         attempts = 0
         setStatus('connected')
       }
-      dispatch(event.data)
+      dispatchFrame(frame)
     }
     active.onclose = (event) => {
       if (!isCurrent()) return

@@ -31,15 +31,10 @@ def _client(api_key: str) -> genai.Client:
     return genai.Client(api_key=api_key, http_options=types.HttpOptions(retry_options=retry))
 
 
-async def generate_text(prompt: str, *, instruction: str) -> str:
-    """One Gemini text call shared by the AI features; failures become friendly AiErrors."""
-    return await generate(prompt, instruction=instruction)
-
-
 async def generate(contents, *, instruction: str = "", model: str = "", allow_empty: bool = False) -> str:
-    """Gemini call for text or audio `contents`. `allow_empty` returns "" instead of raising.
+    """One Gemini call for text or audio `contents`; failures become friendly AiErrors.
 
-    An empty `instruction` sends no system instruction: the transcribe model rejects one."""
+    `allow_empty` returns "" instead of raising. An empty `instruction` sends no system instruction: the transcribe model rejects one."""
     if not settings.gemini_api_key:
         raise AiError(503, "ai_unavailable", "AI features are not set up on this server.")
     try:

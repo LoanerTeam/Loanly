@@ -11,3 +11,4 @@ def install_ai(app: FastAPI) -> None:
     app.include_router(stt.router, prefix="/api/ai")
     app.include_router(tts.router, prefix="/api/ai")
     app.add_exception_handler(AiError, ai_error_handler)
+    app.middleware("http")(stt.reject_large_upload)

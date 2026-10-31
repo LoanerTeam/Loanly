@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Depends, Response
 from starlette.concurrency import run_in_threadpool
 
@@ -10,6 +12,22 @@ from app.deps import get_current_user
 
 def prevent_caching(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store"
+
+
+# shortcut: in-memory, valid while the server runs as one instance (ADR 0003).
+MAX_FAILURES, WINDOW = 10, 15 * 60
+failures: dict[str, list[float]] = {}
+
+
+def recent_failures(username: str) -> list[float]:
+    now = time.monotonic()
+    if len(failures) > 10_000:  # forget stale Usernames so the map cannot grow forever
+        for name in [n for n, times in failures.items() if now - times[-1] >= WINDOW]:
+            del failures[name]
+    times = [t for t in failures.pop(username, []) if now - t < WINDOW]
+    if times:
+        failures[username] = times
+    return times
 
 
 router = APIRouter(dependencies=[Depends(prevent_caching)])
@@ -27,12 +45,15 @@ async def register(body: Credentials) -> dict:
 
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(body: Credentials) -> dict:
+    if len(recent_failures(body.username)) >= MAX_FAILURES:
+        raise AuthError(429, "too_many_attempts", "Too many failed sign-ins. Try again in 15 minutes.")
     user = await repo.find_user(body.username)
     valid = await run_in_threadpool(
         security.check_password, body.password.get_secret_value(),
         user["passwordHash"] if user else security.DUMMY_HASH,
     )
     if not valid or user is None:
+        failures.setdefault(body.username, []).append(time.monotonic())
         raise AuthError(401, "invalid_credentials", "Incorrect Username or Password.")
     return {"token": security.issue_token(body.username)}
 

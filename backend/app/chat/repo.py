@@ -1,9 +1,22 @@
+import asyncio
 from datetime import UTC, datetime
 
 from bson import ObjectId
 from bson.errors import InvalidId
+from pymongo.errors import DuplicateKeyError
 
 from app.db import get_db
+
+
+async def ensure_indexes() -> None:
+    async with asyncio.timeout(5):
+        db = get_db()
+        # Two simultaneous dm.open upserts must not create two rooms for one pair.
+        await db.rooms.create_index("pairKey", unique=True, name="unique_pair",
+                                    partialFilterExpression={"pairKey": {"$exists": True}})
+        await db.messages.create_index([("roomId", 1), ("_id", 1)], name="room_messages")
+        await db.read_markers.create_index([("username", 1), ("roomId", 1)], unique=True,
+                                           name="unique_read_marker")
 
 
 def room_dto(room: dict, viewer: str) -> dict:
@@ -32,12 +45,16 @@ def message_dto(msg: dict) -> dict:
 
 async def get_or_create_private_room(a: str, b: str) -> dict:
     members = sorted([a, b])
-    return await get_db().rooms.find_one_and_update(
-        {"pairKey": "|".join(members)},
-        {"$setOnInsert": {"kind": "private", "name": "", "members": members, "creator": None}},
-        upsert=True,
-        return_document=True,
-    )
+    query = {"pairKey": "|".join(members)}
+    try:
+        return await get_db().rooms.find_one_and_update(
+            query,
+            {"$setOnInsert": {"kind": "private", "name": "", "members": members, "creator": None}},
+            upsert=True,
+            return_document=True,
+        )
+    except DuplicateKeyError:
+        return await get_db().rooms.find_one(query)  # the other user's dm.open created it first
 
 
 async def get_room(room_id: str) -> dict | None:

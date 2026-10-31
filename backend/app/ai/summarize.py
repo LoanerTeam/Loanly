@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.ai import gemini
+from app.ai import gemini, limits
 from app.deps import get_current_user
 
 router = APIRouter()
@@ -33,4 +33,5 @@ class SummarizeResponse(BaseModel):
 async def summarize(body: SummarizeRequest, username: str = Depends(get_current_user)) -> dict:
     lines = "\n".join(f"{line.sender}: {line.text}" for line in body.messages)
     prompt = f"Chat Room: {body.roomName}\nUnread messages, oldest first:\n<messages>\n{lines}\n</messages>"
-    return {"summary": await gemini.generate_text(prompt, instruction=INSTRUCTION)}
+    limits.take("text", username)
+    return {"summary": await gemini.generate(prompt, instruction=INSTRUCTION)}
