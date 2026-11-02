@@ -45,7 +45,10 @@ def test_summarizes_exactly_the_given_messages(client, fake_gemini):
 
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer"}, {"Authorization": "Basic alice"},
                                      {"Authorization": "Bearer NOT A USER"}])
-def test_requires_a_signed_in_user(client, fake_gemini, headers):
+def test_requires_a_signed_in_user(client, fake_gemini, headers, monkeypatch):
+    # Names with spaces/symbols are now valid dev tokens; test actual JWT rejection.
+    monkeypatch.setattr(settings, "dev_auth", False)
+    monkeypatch.setattr(settings, "jwt_secret", "test-only-signing-key-with-at-least-32-bytes")
     response = client.post("/api/ai/summarize", json=BODY, headers=headers)
     assert response.status_code == 401
     assert response.json()["error"] == "invalid_token"

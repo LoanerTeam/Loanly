@@ -1,16 +1,23 @@
 from fastapi import Header
 
 from app.auth.errors import AuthError
-from app.auth.schemas import USERNAME
+from app.auth.schemas import normalize_username
 from app.auth.security import decode_token
 from app.config import settings
 
 
 def verify_token(token: str) -> str | None:
     """Shared synchronous token validation for REST and WebSocket handshakes."""
-    if settings.dev_auth and USERNAME.fullmatch(token):
-        return token
-    return decode_token(token)
+    # Try real JWTs first: a flexible development Username can itself contain dots.
+    username = decode_token(token)
+    if username is not None:
+        return username
+    if settings.dev_auth:
+        try:
+            return normalize_username(token)
+        except ValueError:
+            return None
+    return None
 
 
 def get_current_user(authorization: str = Header(default="")) -> str:

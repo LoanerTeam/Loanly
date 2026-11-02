@@ -55,6 +55,39 @@ test('login stores JWT, verifies profile and opens chat; logout removes token', 
   expect(readToken()).toBe('')
 })
 
+test.each(['A', 'Alice Smith', 'ผู้ใช้ 🌻', '[]{}|\\/*?', 'x'.repeat(60)])(
+  'registration accepts the flexible Username %s and keeps its case and symbols', async (username) => {
+    const onSubmit = vi.fn(async () => {})
+    render(<AuthForm busy={false} error="" onSubmit={onSubmit} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Create an account' }))
+    expect(screen.getByText('Choose a unique username.')).toBeTruthy()
+    expect(screen.queryByText('3–20 lowercase letters, numbers or underscores.')).toBeNull()
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: `  ${username}  ` } })
+    await user.type(screen.getByLabelText('Password'), 'correct password')
+    await user.type(screen.getByLabelText('Confirm password'), 'correct password')
+    await user.click(screen.getByRole('button', { name: 'Register' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('register', username, 'correct password'))
+  },
+)
+
+test('blank Usernames cannot be submitted; login accepts Unicode and trims outer spaces', async () => {
+  const onSubmit = vi.fn(async () => {})
+  render(<AuthForm busy={false} error="" onSubmit={onSubmit} />)
+  const user = userEvent.setup()
+  const input = screen.getByLabelText('Username') as HTMLInputElement
+  await user.type(input, '   ')
+  await user.type(screen.getByLabelText('Password'), 'correct password')
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
+  expect(input.validity.valid).toBe(false)
+  expect(onSubmit).not.toHaveBeenCalled()
+  fireEvent.submit(input.closest('form')!)
+  expect(onSubmit).not.toHaveBeenCalled()
+  fireEvent.change(input, { target: { value: '  Alice ทดสอบ | 🌻  ' } })
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('login', 'Alice ทดสอบ | 🌻', 'correct password'))
+})
+
 test('register uses its endpoint, masks passwords, and prevents duplicate submissions while pending', async () => {
   let resolve!: (value: Response) => void
   fetchMock.mockImplementationOnce(() => new Promise<Response>((done) => { resolve = done }))

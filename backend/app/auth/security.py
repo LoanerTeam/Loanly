@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import bcrypt
 import jwt
 
-from app.auth.schemas import USERNAME
+from app.auth.schemas import normalize_username
 from app.config import settings
 
 HASH_SCHEME = "bcrypt-sha256$"
@@ -53,7 +53,7 @@ def decode_token(token: str) -> str | None:
         claims = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"],
                             options={"require": ["sub", "iat", "exp"]})
         username = claims["sub"]
-        if (not isinstance(username, str) or not USERNAME.fullmatch(username)
+        if (not isinstance(username, str) or normalize_username(username) != username
                 or not isinstance(claims["iat"], (int, float))
                 or not isinstance(claims["exp"], (int, float))
                 or claims["exp"] <= claims["iat"]):
