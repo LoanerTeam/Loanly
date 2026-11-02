@@ -25,9 +25,14 @@ test('explicit disconnect removes the saved username', () => {
   expect(readDevSession()).toBe('')
 })
 
-test('ignores invalid saved usernames', () => {
-  saveDevSession('invalid username')
+test('ignores blank saved usernames', () => {
+  saveDevSession('   ')
   expect(readDevSession()).toBe('')
+})
+
+test('preserves Unicode, case, spaces and symbols while trimming surrounding whitespace', () => {
+  saveDevSession('  Alice ทดสอบ | \\🌻  ')
+  expect(readDevSession()).toBe('Alice ทดสอบ | \\🌻')
 })
 
 test('unavailable browser storage does not break connecting or disconnecting', () => {

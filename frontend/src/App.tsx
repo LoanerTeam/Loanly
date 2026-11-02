@@ -96,7 +96,10 @@ function DevApp() {
         <h1 className="text-3xl font-semibold">Loanly</h1>
         {import.meta.env.DEV ? <form className="mt-6 space-y-4" onSubmit={submit}>
           <p className="text-sm text-slate-500">Development connection · backend requires DEV_AUTH=1</p>
-          <label className="block">Username<input className="mt-2 w-full rounded-lg border border-slate-300 p-2" value={username} onChange={(e) => setUsername(e.target.value)} pattern="[a-z0-9_]{3,20}" minLength={3} maxLength={20} required autoComplete="username" /></label>
+          <label className="block">Username<input className="mt-2 w-full rounded-lg border border-slate-300 p-2" value={username} onChange={(e) => {
+            setUsername(e.target.value)
+            e.target.setCustomValidity(e.target.value.trim() ? '' : 'Enter a username.')
+          }} required autoComplete="username" /></label>
           <button className="w-full rounded-lg bg-slate-800 px-4 py-2 text-white" type="submit">Connect</button>
         </form> : <p className="mt-4 text-slate-500">Sign-in will be available with the account feature.</p>}
       </div>

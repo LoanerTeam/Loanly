@@ -45,7 +45,8 @@ def message_dto(msg: dict) -> dict:
 
 async def get_or_create_private_room(a: str, b: str) -> dict:
     members = sorted([a, b])
-    query = {"pairKey": "|".join(members)}
+    # Escape separators as well as escapes. Existing lowercase-only keys stay unchanged.
+    query = {"pairKey": "|".join(name.replace("\\", "\\\\").replace("|", "\\|") for name in members)}
     try:
         return await get_db().rooms.find_one_and_update(
             query,

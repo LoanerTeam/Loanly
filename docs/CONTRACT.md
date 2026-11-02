@@ -4,7 +4,7 @@ The only thing the four workstreams share. Change it by PR with all four owners 
 Vocabulary is in `GLOSSARY.md`.
 
 ## Conventions
-- Usernames: `^[a-z0-9_]{3,20}$`, unique. Passwords: 8+ chars.
+- Usernames: any valid Unicode text (including uppercase letters, Thai, spaces and symbols), with leading/trailing whitespace trimmed. Must be nonblank and unique; comparisons are case-sensitive. Passwords: 8+ chars.
 - IDs are strings (Mongo ObjectId hex). `ts` is ISO-8601 UTC.
 - REST base `/api`, `Authorization: Bearer <jwt>`. Errors: `{ "error": "<code>", "detail": "<text>" }`.
 - Message text: 1–2000 chars.
@@ -64,4 +64,4 @@ Rules: non-members never receive a group's messages; a private room's messages g
 
 ## MongoDB (db `loanly`)
 `users {username, passwordHash, targetLang}` — owned by P2.
-`rooms {kind, name, members, creator, pairKey?}` (`pairKey` = sorted "a|b" for private, unique) · `messages {roomId, sender, text, ts}` · `read_markers {username, roomId, messageId}` — owned by P1.
+`rooms {kind, name, members, creator, pairKey?}` (`pairKey` = sorted usernames, escaping each backslash as `\\` and each `|` as `\|`, then joining with `|`; unique for private rooms and compatible with existing lowercase-only keys) · `messages {roomId, sender, text, ts}` · `read_markers {username, roomId, messageId}` — owned by P1.
