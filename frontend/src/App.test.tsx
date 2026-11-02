@@ -67,6 +67,25 @@ test('development Username form requires explicit opt-in and is excluded from pr
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy()
 })
 
+test('development form accepts flexible usernames and restores them after reload', async () => {
+  vi.stubEnv('DEV', true)
+  vi.stubEnv('VITE_DEV_AUTH', '1')
+  const first = render(<App />)
+  const user = userEvent.setup()
+  const input = screen.getByLabelText('Username') as HTMLInputElement
+  await user.type(input, '   ')
+  await user.click(screen.getByRole('button', { name: 'Connect' }))
+  expect(Socket.instances).toHaveLength(0)
+  await user.clear(input)
+  await user.type(input, '  Alice ทดสอบ | 🌻  ')
+  await user.click(screen.getByRole('button', { name: 'Connect' }))
+  const expectedToken = encodeURIComponent('Alice ทดสอบ | 🌻')
+  expect(Socket.instances.at(-1)?.url).toContain(`/ws?token=${expectedToken}`)
+  first.unmount()
+  render(<App />)
+  expect(Socket.instances.at(-1)?.url).toContain(`/ws?token=${expectedToken}`)
+})
+
 test('restores translation preference on reload and wires message translation through REST', async () => {
   saveToken('signed-jwt')
   let language = 'th'

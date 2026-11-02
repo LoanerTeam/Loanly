@@ -103,3 +103,28 @@ def test_history_is_stored_for_offline_user_and_ordered(client):
         frame = recv(b, "history")
     assert frame["reqId"] == "h"
     assert [m["text"] for m in frame["messages"]] == ["one", "two"]
+
+
+async def test_private_room_keys_do_not_confuse_names_with_separators(monkeypatch):
+    db = AsyncMongoMockClient()["loanly_test_pair_keys"]
+    monkeypatch.setattr(repo, "get_db", lambda: db)
+    pairs = [("a", "b|c"), ("a|b", "c"), ("a", r"b\|c"), ("a|b\\", "c"),
+             ("Alice ทดสอบ", "เพื่อน 🌻")]
+    rooms = [await repo.get_or_create_private_room(*pair) for pair in pairs]
+    assert len({room["_id"] for room in rooms}) == len(pairs)
+    for pair, room in zip(pairs, rooms, strict=True):
+        reverse = await repo.get_or_create_private_room(*reversed(pair))
+        assert reverse["_id"] == room["_id"]
+        assert reverse["members"] == sorted(pair)
+
+
+async def test_existing_private_rooms_and_history_keep_their_keys(monkeypatch):
+    db = AsyncMongoMockClient()["loanly_test_legacy_keys"]
+    monkeypatch.setattr(repo, "get_db", lambda: db)
+    existing = {"kind": "private", "name": "", "members": ["alice", "bob"],
+                "creator": None, "pairKey": "alice|bob"}
+    room_id = (await db.rooms.insert_one(existing)).inserted_id
+    message = await repo.add_message(str(room_id), "alice", "existing history")
+    restored = await repo.get_or_create_private_room("bob", "alice")
+    assert restored["_id"] == room_id
+    assert (await repo.list_messages(str(restored["_id"])))[0]["_id"] == message["_id"]

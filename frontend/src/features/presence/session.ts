@@ -3,15 +3,14 @@ const key = 'loanly.dev.username'
 
 export function readDevSession(): string {
   try {
-    const username = sessionStorage.getItem(key) ?? ''
-    return /^[a-z0-9_]{3,20}$/.test(username) ? username : ''
+    return (sessionStorage.getItem(key) ?? '').trim()
   } catch {
     return ''
   }
 }
 
 export function saveDevSession(username: string): void {
-  try { sessionStorage.setItem(key, username) } catch { /* Storage may be disabled. */ }
+  try { sessionStorage.setItem(key, username.trim()) } catch { /* Storage may be disabled. */ }
 }
 
 export function clearDevSession(): void {
