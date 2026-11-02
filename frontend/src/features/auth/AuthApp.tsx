@@ -31,10 +31,10 @@ export function AuthForm({ busy, error, onSubmit }: {
   const mismatch = submitted && mode === 'register' && password !== confirmPassword
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (busy) return
+    if (busy || !username.trim()) return
     setSubmitted(true)
     if (mode === 'register' && password !== confirmPassword) return
-    await onSubmit(mode, username, password)
+    await onSubmit(mode, username.trim(), password)
     setPassword('')
     setConfirmPassword('')
     setShowPassword(false)
@@ -44,11 +44,13 @@ export function AuthForm({ busy, error, onSubmit }: {
     <h2 className="text-xl font-semibold">{mode === 'login' ? 'Sign in' : 'Create account'}</h2>
     <label className="block">Username
       <input className="mt-2 w-full rounded-lg border border-slate-300 p-2" value={username}
-        onChange={(event) => setUsername(event.target.value)} pattern="[a-z0-9_]{3,20}"
-        minLength={3} maxLength={20} required autoComplete="username" disabled={busy}
+        onChange={(event) => {
+          setUsername(event.target.value)
+          event.target.setCustomValidity(event.target.value.trim() ? '' : 'Enter a username.')
+        }} required autoComplete="username" disabled={busy}
         aria-describedby="username-help" />
     </label>
-    <p id="username-help" className="text-sm text-slate-500">3–20 lowercase letters, numbers or underscores.</p>
+    <p id="username-help" className="text-sm text-slate-500">Choose a unique username.</p>
     <PasswordField label="Password" value={password} onChange={setPassword} visible={showPassword}
       onToggle={() => setShowPassword(!showPassword)} disabled={busy} describedBy={passwordHelpId}
       autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />

@@ -90,11 +90,53 @@ def test_duplicate_username_and_wrong_credentials(auth_client):
     }
 
 
+@pytest.mark.parametrize("username", [
+    "A", "Alice", "Alice Smith", "ผู้ใช้ 🌻", "[]{}|\\/*?", "x" * 60,
+    "<img src=x onerror=alert(1)>",
+])
+def test_flexible_usernames_register_login_and_connect_with_jwt(auth_client, username):
+    response = register(auth_client, username)
+    assert response.status_code == 201
+    token = response.json()["token"]
+    assert verify_token(token) == username
+    assert auth_client.get("/api/me", headers=bearer(token)).json()["username"] == username
+    login = auth_client.post("/api/auth/login", json={
+        "username": username, "password": "correct password",
+    })
+    assert login.status_code == 200
+    assert verify_token(login.json()["token"]) == username
+    assert register(auth_client, username).status_code == 409
+    with auth_client.websocket_connect(f"/ws?token={token}") as ws:
+        snapshot = ws.receive_json()
+        assert snapshot["me"] == username
+        assert snapshot["users"] == [{"username": username, "online": True}]
+
+
+def test_username_whitespace_is_trimmed_for_uniqueness_and_login(auth_client):
+    username = "Alice ทดสอบ | 🌻"
+    registered = register(auth_client, f"  {username}  ")
+    assert registered.status_code == 201
+    assert verify_token(registered.json()["token"]) == username
+    assert register(auth_client, username).status_code == 409
+    login = auth_client.post("/api/auth/login", json={
+        "username": f"\t{username}\n", "password": "correct password",
+    })
+    assert login.status_code == 200
+    assert verify_token(login.json()["token"]) == username
+
+
+def test_usernames_preserve_case_sensitive_identity(auth_client):
+    upper = register(auth_client, "Alice").json()["token"]
+    lower = register(auth_client, "alice").json()["token"]
+    assert upper != lower
+    assert auth_client.get("/api/me", headers=bearer(upper)).json()["username"] == "Alice"
+    assert auth_client.get("/api/me", headers=bearer(lower)).json()["username"] == "alice"
+
+
 @pytest.mark.parametrize("body", [
-    {}, {"username": "aa", "password": "secret123"},
-    {"username": "a" * 21, "password": "secret123"},
-    {"username": "Alice", "password": "secret123"},
-    {"username": "alice\n", "password": "secret123"},
+    {}, {"username": "", "password": "secret123"},
+    {"username": " \t\n", "password": "secret123"},
+    {"username": "\ud800", "password": "secret123"},
     {"username": {"$ne": None}, "password": "secret123"},
     {"username": "alice", "password": "short"},
     {"username": "alice", "password": 12345678},
@@ -163,7 +205,7 @@ def test_real_jwt_connects_and_registration_announces_presence(auth_client):
 
 
 @pytest.mark.parametrize("change", [
-    {"exp": 1}, {"sub": "Invalid"}, {"sub": 123}, {"sub": "alice\n"},
+    {"exp": 1}, {"sub": "   "}, {"sub": 123}, {"sub": "alice\n"},
     {"iat": 9999999999}, {"exp": None},
 ])
 def test_invalid_claims_rejected_for_rest_and_ws(auth_client, change):
@@ -192,7 +234,8 @@ def test_signature_algorithm_required_claims_and_dev_fallback(auth_config, monke
     monkeypatch.setattr(settings, "dev_auth", True)
     assert verify_token("alice") == "alice"
     assert verify_token(token) == "alice"  # Real JWTs still work in dev mode.
-    assert verify_token("invalid username") is None
+    assert verify_token("Alice ทดสอบ | \\🌻") == "Alice ทดสอบ | \\🌻"
+    assert verify_token("  ") is None
 
 
 def test_long_unicode_passwords_are_not_truncated(auth_client):

@@ -1,10 +1,16 @@
-import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
-USERNAME = re.compile(r"[a-z0-9_]{3,20}")
 Language = Literal["en", "th", "ja", "zh", "ko", "es", "fr", "de"]
+
+
+def normalize_username(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise ValueError("Username cannot be blank")
+    value.encode("utf-8")  # Reject invalid Unicode before writing to MongoDB.
+    return value
 
 
 class Credentials(BaseModel):
@@ -14,9 +20,7 @@ class Credentials(BaseModel):
     @field_validator("username")
     @classmethod
     def valid_username(cls, value: str) -> str:
-        if not USERNAME.fullmatch(value):
-            raise ValueError("Username must be 3–20 lowercase letters, numbers or underscores")
-        return value
+        return normalize_username(value)
 
     @field_validator("password")
     @classmethod

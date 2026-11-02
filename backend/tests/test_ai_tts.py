@@ -81,7 +81,10 @@ def test_returns_playable_wav_and_sends_verbatim_text(client, provider, text):
 
 
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer garbage!"}])
-def test_auth_before_provider(client, provider, headers):
+def test_auth_before_provider(client, provider, headers, monkeypatch):
+    # An arbitrary string is a valid Username in dev mode, but never a production JWT.
+    monkeypatch.setattr(settings, "dev_auth", False)
+    monkeypatch.setattr(settings, "jwt_secret", "test-only-signing-key-with-at-least-32-bytes")
     assert client.post("/api/ai/tts", headers=headers, json={"text": "hi"}).status_code == 401
     assert provider[0] == []
 

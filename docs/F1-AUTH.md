@@ -6,6 +6,12 @@ use it for its language selector without changing the users collection.
 
 ## Backend
 
+Usernames accept valid Unicode text, including uppercase letters, Thai, spaces,
+and symbols, without a character whitelist or length rule. Register and Login
+trim surrounding whitespace and reject blank names. Uniqueness remains
+case-sensitive: `Alice` and `alice` are distinct accounts. JWT subjects preserve
+the canonical Username, and development tokens follow the same policy.
+
 `app.auth.setup.install_auth(app)` installs the REST router and contract-shaped
 error handlers. Call it before mounting the static frontend.
 `await initialize_auth()` validates configuration and establishes the unique
