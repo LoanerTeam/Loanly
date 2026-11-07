@@ -81,6 +81,29 @@ def test_missing_audio_field_is_a_validation_error(client, model):
     model.assert_not_called()
 
 
+def test_transcribes_chunked_upload_without_content_length(client, model):
+    request = client.build_request("POST", "/api/ai/stt", headers=HEADERS,
+                                   files={"audio": ("clip", WEBM, "audio/webm")})
+    body = request.read()
+    headers = dict(request.headers)
+    del headers["content-length"]
+    response = client.post("/api/ai/stt", headers=headers,
+                           content=iter([body[:32], body[32:]]))
+    assert response.status_code == 200
+    assert response.json() == {"text": "hello there"}
+    model.assert_called_once()
+
+
+def test_rejects_oversized_chunked_body_before_parsing(client, model, monkeypatch):
+    monkeypatch.setattr(stt, "MAX_BYTES", 100)
+    monkeypatch.setattr(stt, "FORM_OVERHEAD", 100)
+    response = client.post("/api/ai/stt", headers=HEADERS,
+                           content=iter([b"x" * 100, b"x" * 101]))
+    assert response.status_code == 413
+    assert response.json()["error"] == "audio_too_large"
+    model.assert_not_called()
+
+
 def test_empty_transcript_is_no_speech_and_never_asks_a_chat_model(client, model):
     """A chat model given silence would reply with text, which must not reach the chat box."""
     model.return_value = SimpleNamespace(text="")
