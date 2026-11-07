@@ -7,3 +7,5 @@ pyjwt
 google-genai
 python-multipart
 langdetect==1.0.9
+httpx
+pyasn1>=0.6.5
