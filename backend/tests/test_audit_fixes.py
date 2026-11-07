@@ -61,6 +61,11 @@ def test_daily_limit_is_shared_and_resets_on_a_new_day(monkeypatch):
     limits.take("tts", "carol")
 
 
+def test_stt_without_content_length_still_requires_audio(client):
+    response = client.post("/api/ai/stt", headers={**ALICE, "Content-Length": ""}, content=b"")
+    assert response.status_code == 422
+
+
 def test_websocket_token_is_masked_in_uvicorn_logs():
     record = logging.LogRecord("uvicorn.error", logging.INFO, "", 0, '%s - "WebSocket %s" [accepted]',
                                ("1.2.3.4:5", "/ws?token=secret.jwt.value&x=1"), None)
