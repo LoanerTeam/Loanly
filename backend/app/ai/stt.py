@@ -42,26 +42,15 @@ def check_audio(mime: str, data: bytes) -> str:
 
 
 async def reject_large_upload(request: Request, call_next):
-    """Bound multipart uploads before parsing, including requests without Content-Length."""
+    """FastAPI saves the whole form before the handler runs, so check the size first.
+    Browsers always send Content-Length for a FormData upload."""
     if request.url.path == "/api/ai/stt":
         size = request.headers.get("content-length", "")
-        limit = MAX_BYTES + FORM_OVERHEAD
-
-        def too_large():
+        if not size.isdigit() or int(size) > MAX_BYTES + FORM_OVERHEAD:
             return JSONResponse(status_code=413, content={
                 "error": "audio_too_large",
                 "detail": "The recording is too long. Keep it under a few minutes.",
             })
-
-        if size.isdigit() and int(size) > limit:
-            return too_large()
-        body = bytearray()
-        async for chunk in request.stream():
-            if len(body) + len(chunk) > limit:
-                return too_large()
-            body.extend(chunk)
-        # Starlette's cached request replays this bounded body to the form parser.
-        request._body = bytes(body)
     return await call_next(request)
 
 
