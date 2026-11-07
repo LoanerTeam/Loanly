@@ -4,7 +4,7 @@ motor
 pydantic-settings
 bcrypt
 pyjwt
-google-genai
+google-genai>=2.33,<3  # 3.0 calls API v1, where the transcribe model is not found
 python-multipart
 langdetect==1.0.9
 httpx
